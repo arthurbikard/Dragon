@@ -1,0 +1,43 @@
+.card {
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  font-family: 'Arial', sans-serif;
+}
+
+.card.dragon {
+  background: linear-gradient(135deg, #ffcc33, #ff6699);
+  border: 2px solid #cc9900;
+}
+
+.card.spell {
+  background: linear-gradient(135deg, #66ccff, #3399ff);
+  border: 2px solid #0066cc;
+}
+
+.card.shield {
+  background: linear-gradient(135deg, #99ff99, #33cc33);
+  border: 2px solid #009900;
+}
+
+.card h2 {
+  font-size: 1.5em;
+  color: #333;
+}
+
+.card span {
+  font-size: 1.2em;
+}
+
+.card .emoji {
+  margin-right: 8px;
+}
+
+.card .decorative {
+  display: inline-block;
+  width: 100%;
+  height: 4px;
+  background: url('path/to/decorative-element.png') repeat-x;
+  margin-top: 10px;
+}
