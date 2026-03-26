@@ -1,1 +1,29 @@
-name: Generate Images\n\non:  \n  push:  \n    branches: [main]  \n\njobs:  \n  generate_images:  \n    runs-on: ubuntu-latest  \n    steps:  \n      - name: Checkout code  \n        uses: actions/checkout@v2  \n      - name: Set up Python  \n        uses: actions/setup-python@v2  \n        with:  \n          python-version: '3.x'  \n      - name: Install dependencies  \n        run: |  \n          python -m pip install --upgrade pip  \n          pip install -r requirements.txt  \n      - name: Generate Images  \n        run: |  \n          python generate_images.py  \n      - name: Commit images  \n        run: |  \n          git config --local user.email 'action@github.com'  \n          git config --local user.name 'GitHub Action'  \n          git add .  \n          git commit -m 'Add generated dragon card images' || echo 'No changes to commit.'  \n          git push
+# This workflow will install the required packages and run the Python script.
+
+name: Generate Images
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install requests
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Run the script
+      run: |
+        python your_script.py  # Replace your_script.py with the actual script name
