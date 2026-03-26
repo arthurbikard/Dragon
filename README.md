@@ -1,5 +1,5 @@
 # Dragon
 
-A thrilling adventure game where you explore the world and battle enemies.
+Welcome to the Dragon project!
 
-[Play the game](index.html)
+You can view the documentation and project pages at [GitHub Pages](https://arthurbikard.github.io/Dragon/).
