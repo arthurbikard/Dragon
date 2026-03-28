@@ -1,5 +1,8 @@
 // Core game state and logic
 
+// Dev mode flag — toggled from menu, used by map-ui.js
+var MAP_DEBUG = false;
+
 const GAME_MODES = { AI: 'ai', PVP: 'pvp' };
 const GAME_PHASES = {
   MENU: 'menu',

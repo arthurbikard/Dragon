@@ -2,9 +2,7 @@
 
 // === WORLD MAP SCREEN ===
 
-// Dev mode: toggled from the menu screen
-// Using var so it's accessible across script tags
-var MAP_DEBUG = false;
+// Dev mode: MAP_DEBUG is declared in game.js (loads before this file)
 
 function renderMap() {
   const campaign = gameState.campaign;
@@ -194,7 +192,8 @@ function renderWorldLocations() {
     if (!MAP_DEBUG && !explored && !isCurrent) continue; // hidden in fog (debug shows all)
 
     let stateClass = 'loc-fog';
-    if (isCurrent) stateClass = 'loc-current';
+    if (MAP_DEBUG) stateClass = 'loc-debug';
+    else if (isCurrent) stateClass = 'loc-current';
     else if (cleared) stateClass = 'loc-cleared';
     else if (visited) stateClass = 'loc-visited';
     else if (explored) stateClass = 'loc-explored';
