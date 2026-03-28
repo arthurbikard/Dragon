@@ -304,6 +304,69 @@ IMAGES = {
         f"A lonely campfire in a forest clearing at night, "
         f"a tent and bedroll beside it, stars visible through tree canopy, {STYLE}"
     ),
+
+    # --- WHISPERING COAST BIOME ---
+    # Coast locations
+    "coast_starting_village.png": (
+        f"A small coastal fishing village at dusk, thatched roof cottages on rocky cliffs, "
+        f"fishing boats moored in a small harbor, warm lantern light, "
+        f"fog rolling in from the sea, peaceful but ominous atmosphere, {STYLE}"
+    ),
+    "coast_fishermans_cove.png": (
+        f"A rocky cove with torn fishing nets draped over boulders, "
+        f"dark tide pools, scattered fish bones, claw marks on the rocks, "
+        f"foggy coastal scene, something lurking in shallow water, {STYLE}"
+    ),
+    "coast_sea_cave.png": (
+        f"The entrance to a dark sea cave carved into a cliff face, "
+        f"bioluminescent blue algae glowing on the walls inside, "
+        f"waves crashing at the entrance, mysterious and inviting, {STYLE}"
+    ),
+    "coast_shore_market.png": (
+        f"An open-air market on a coastal pier with canvas awnings, "
+        f"merchant stalls with potions and scrolls, lanterns hanging from ropes, "
+        f"a few travelers browsing wares, evening coastal atmosphere, {STYLE}"
+    ),
+    "coast_lighthouse.png": (
+        f"A tall stone lighthouse on a rocky promontory, its light extinguished, "
+        f"dark storm clouds behind it, waves crashing against the base, "
+        f"an ominous creature silhouette perched at the top, {STYLE}"
+    ),
+    "coast_tide_pools.png": (
+        f"Warm steaming tide pools among coastal rocks at sunset, "
+        f"a small campfire nearby, a bedroll under a rocky overhang, "
+        f"peaceful resting spot with golden light, sea in the background, {STYLE}"
+    ),
+    "coast_driftwood_camp.png": (
+        f"A chaotic pile of shipwreck driftwood on a beach, "
+        f"broken masts and torn sails, dark nests built from wreckage, "
+        f"something dangerous hiding among the debris, stormy sky, {STYLE}"
+    ),
+    "coast_storm_bluff.png": (
+        f"A dramatic windswept cliff at the edge of the coast, "
+        f"lightning crackling in the sky, a powerful drake silhouette against storm clouds, "
+        f"the path forward leads to a dark forest visible in the distance, {STYLE}"
+    ),
+
+    # Coast enemies
+    "enemy_coastal_serpent.png": (
+        f"A massive sea serpent with iridescent blue and silver scales, "
+        f"coiled around rocks in the ocean, glowing cyan eyes, "
+        f"water dripping from its fangs, stormy sea background, portrait view, {STYLE}"
+    ),
+    "enemy_storm_drake.png": (
+        f"A powerful storm drake with dark blue and electric purple scales, "
+        f"lightning crackling between its horns and wings, "
+        f"hovering above a cliff edge in a thunderstorm, portrait view, {STYLE}"
+    ),
+
+    # Coast map background (wide panoramic for scrollable map)
+    "coast_map_bg.png": (
+        f"A wide panoramic view of a misty coastline from above, "
+        f"rocky shores, a small village, a lighthouse on a cliff, "
+        f"foggy ocean stretching to the horizon, blue-grey color palette, "
+        f"painted in the style of a fantasy game world map, atmospheric, {STYLE}"
+    ),
 }
 
 

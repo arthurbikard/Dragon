@@ -1244,22 +1244,22 @@ html, body {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
-  background:
-    radial-gradient(circle at 30% 40%, rgba(13, 27, 42, 0.8), transparent 60%),
-    radial-gradient(circle at 70% 60%, rgba(42, 42, 68, 0.3), transparent 50%),
-    var(--abyss);
+  background: var(--abyss);
   width: 100%;
   min-height: 0;
 }
 
 .world-viewport::-webkit-scrollbar { display: none; }
 
-/* Canvas: full world size, wider than viewport to enable horizontal scroll */
+/* Canvas: sized to match the coast map panoramic aspect ratio */
 .world-canvas {
   position: relative;
-  width: 900px;
-  height: 900px;
-  padding: 40px;
+  width: 1200px;
+  height: 500px;
+  padding: 20px;
+  background-image: url('images/coast_map_bg.png');
+  background-size: cover;
+  background-position: center;
 }
 
 /* SVG paths between locations */
@@ -1292,13 +1292,14 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--obsidian);
+  background: rgba(10, 10, 20, 0.7);
   background-size: cover;
   background-position: center;
-  border: 2px solid rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.15);
   transition: border-color 0.2s, box-shadow 0.2s;
   font-size: 1.2rem;
   overflow: hidden;
+  backdrop-filter: blur(2px);
 }
 
 /* Inner shadow on location images */

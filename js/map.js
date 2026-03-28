@@ -25,7 +25,7 @@ const LOC_ICONS = {
 };
 
 // Tile size for positioning (pixels per grid unit)
-const TILE_SIZE = 80;
+const TILE_SIZE = 70;
 
 // === WORLD DEFINITION ===
 
@@ -47,7 +47,7 @@ const WORLD = {
       name: 'Starting Village',
       biome: 'coast',
       type: LOC_TYPES.NPC,
-      x: 2, y: 8,
+      x: 8, y: 4,
       paths: ['fishermans_cove'],
       description: 'A quiet fishing village at the edge of the world. The elder waits by the fire.',
       image: 'images/loc_village.png',
@@ -68,7 +68,7 @@ const WORLD = {
       name: "Fisherman's Cove",
       biome: 'coast',
       type: LOC_TYPES.BATTLE,
-      x: 4, y: 6,
+      x: 6, y: 3,
       paths: ['starting_village', 'sea_cave', 'shore_market'],
       description: 'Nets lie torn on the rocks. Something lurks in the shallows.',
       image: 'images/loc_misty_shore.png',
@@ -79,7 +79,7 @@ const WORLD = {
       name: 'Sea Cave',
       biome: 'coast',
       type: LOC_TYPES.EVENT,
-      x: 3, y: 4,
+      x: 4, y: 2,
       paths: ['fishermans_cove', 'lighthouse'],
       description: 'A dark cave mouth gapes in the cliff face. Strange sounds echo from within.',
       image: 'images/loc_crystal_cave.png',
@@ -89,7 +89,7 @@ const WORLD = {
       name: 'Shore Market',
       biome: 'coast',
       type: LOC_TYPES.SHOP,
-      x: 6, y: 7,
+      x: 9, y: 2,
       paths: ['fishermans_cove', 'tide_pools', 'driftwood_camp'],
       description: 'A few merchants still trade here, despite the dangers.',
       image: 'images/loc_village.png',
@@ -98,7 +98,7 @@ const WORLD = {
       name: 'Lighthouse',
       biome: 'coast',
       type: LOC_TYPES.ELITE,
-      x: 2, y: 2,
+      x: 2, y: 3,
       paths: ['sea_cave', 'tide_pools'],
       description: 'The light has gone dark. A powerful creature has claimed the tower.',
       image: 'images/loc_dragons_lair.png',
@@ -109,7 +109,7 @@ const WORLD = {
       name: 'Tide Pools',
       biome: 'coast',
       type: LOC_TYPES.REST,
-      x: 5, y: 3,
+      x: 5, y: 1,
       paths: ['lighthouse', 'shore_market', 'coast_end'],
       description: 'Warm pools among the rocks. A good place to rest and prepare.',
       image: 'images/loc_wanderers_camp.png',
@@ -118,7 +118,7 @@ const WORLD = {
       name: 'Driftwood Camp',
       biome: 'coast',
       type: LOC_TYPES.BATTLE,
-      x: 8, y: 6,
+      x: 12, y: 3,
       paths: ['shore_market', 'coast_end'],
       description: 'Wreckage from ships piles high. Creatures nest among the debris.',
       image: 'images/loc_misty_shore.png',
@@ -129,7 +129,7 @@ const WORLD = {
       name: 'Storm Bluff',
       biome: 'coast',
       type: LOC_TYPES.MINI_BOSS,
-      x: 8, y: 3,
+      x: 14, y: 1,
       paths: ['tide_pools', 'driftwood_camp'],
       description: 'The path ends at a windswept cliff. A powerful drake guards the passage to the forest beyond.',
       image: 'images/loc_volcano_peak.png',
