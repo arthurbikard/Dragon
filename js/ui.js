@@ -131,6 +131,23 @@ function renderBattle() {
   `;
 }
 
+function getHpClass(percent) {
+  if (percent > 60) return 'hp-high';
+  if (percent > 30) return 'hp-mid';
+  return 'hp-low';
+}
+
+function renderCombatantPortrait(image, element, size) {
+  const sizeClass = size === 'lg' ? 'portrait-lg' : 'portrait-sm';
+  if (image) {
+    return `<div class="combatant-portrait ${sizeClass}" style="background-image: url('${image}')"></div>`;
+  }
+  const bg = element ? ELEMENT_COLORS[element].bg : '#333';
+  return `<div class="combatant-portrait ${sizeClass}" style="background: ${bg}">
+    <span class="portrait-fallback">${element ? ELEMENT_ICONS[element] : '🐉'}</span>
+  </div>`;
+}
+
 function renderEnemyArea(e) {
   const hpPercent = (e.hp / e.maxHp) * 100;
   const isAI = gameState.mode === GAME_MODES.AI;
@@ -142,10 +159,6 @@ function renderEnemyArea(e) {
     label = gameState.currentTurn === 'player' ? 'Player 2' : 'Player 1';
   }
 
-  const portraitStyle = e.image
-    ? `background-image: url('${e.image}')`
-    : `background: ${e.element ? ELEMENT_COLORS[e.element].bg : '#333'}`;
-
   const intentHtml = isAI && gameState.enemy.nextIntent
     ? `<div class="intent-row">
         <span class="intent-label">Next:</span>
@@ -154,19 +167,19 @@ function renderEnemyArea(e) {
     : '';
 
   return `
-    <div class="enemy-area">
-      <div class="enemy-portrait ${e.image ? '' : 'enemy-portrait-fallback'}" style="${portraitStyle}">
-        ${e.image ? '' : `<span>${e.element ? ELEMENT_ICONS[e.element] : '🐉'}</span>`}
-      </div>
-      <div class="enemy-stats">
-        <div class="enemy-header">
+    <div class="combatant-area enemy-area">
+      ${renderCombatantPortrait(e.image, e.element, 'lg')}
+      <div class="combatant-stats">
+        <div class="combatant-header">
           <span class="combatant-name">${label}</span>
           ${renderStatuses(e)}
           ${e.block > 0 ? `<span class="block-badge">🛡 ${e.block}</span>` : ''}
         </div>
-        <div class="hp-bar-container">
-          <div class="hp-bar hp-bar-enemy" style="width: ${hpPercent}%"></div>
-          <span class="hp-text">${e.hp} / ${e.maxHp}</span>
+        <div class="hp-row">
+          <div class="hp-bar-container">
+            <div class="hp-bar ${getHpClass(hpPercent)}" style="width: ${hpPercent}%"></div>
+          </div>
+          <span class="hp-number">${e.hp}<span class="hp-max">/${e.maxHp}</span></span>
         </div>
         ${intentHtml}
       </div>
@@ -191,6 +204,7 @@ function renderIntent(intent) {
 
 function renderPlayerBar(p, canAct) {
   const hpPercent = (p.hp / p.maxHp) * 100;
+  const playerImage = `images/dragon_${p.element}.png`;
 
   let label;
   if (gameState.mode === GAME_MODES.AI) {
@@ -199,38 +213,40 @@ function renderPlayerBar(p, canAct) {
     label = gameState.currentTurn === 'player' ? 'Player 1' : 'Player 2';
   }
 
+  const energy = canAct ? getCurrentActor().energy : 0;
+
   return `
-    <div class="player-bar">
-      <div class="player-bar-icon" style="background: ${ELEMENT_COLORS[p.element].bg}">
-        ${ELEMENT_ICONS[p.element]}
-      </div>
-      <div class="player-bar-info">
-        <div class="player-bar-header">
+    <div class="combatant-area player-area">
+      ${renderCombatantPortrait(playerImage, p.element, 'sm')}
+      <div class="combatant-stats">
+        <div class="combatant-header">
           <span class="combatant-name">${label}</span>
           ${renderStatuses(p)}
           ${p.block > 0 ? `<span class="block-badge">🛡 ${p.block}</span>` : ''}
         </div>
-        <div class="hp-bar-container">
-          <div class="hp-bar hp-bar-player" style="width: ${hpPercent}%"></div>
-          <span class="hp-text">${p.hp} / ${p.maxHp}</span>
+        <div class="hp-row">
+          <div class="hp-bar-container">
+            <div class="hp-bar ${getHpClass(hpPercent)}" style="width: ${hpPercent}%"></div>
+          </div>
+          <span class="hp-number">${p.hp}<span class="hp-max">/${p.maxHp}</span></span>
         </div>
       </div>
-      <div class="energy-display">
-        ${renderEnergy(canAct ? getCurrentActor().energy : 0)}
+      <div class="energy-gems">
+        ${renderEnergy(energy)}
       </div>
     </div>
   `;
 }
 
 function renderEnergy(energy) {
-  let dots = '';
+  let gems = '';
   for (let i = 0; i < MAX_ENERGY; i++) {
-    dots += `<span class="energy-dot ${i < energy ? 'filled' : 'empty'}"></span>`;
+    gems += `<span class="energy-gem ${i < energy ? 'gem-filled' : 'gem-empty'}"></span>`;
   }
   for (let i = MAX_ENERGY; i < energy; i++) {
-    dots += `<span class="energy-dot filled bonus"></span>`;
+    gems += `<span class="energy-gem gem-filled gem-bonus"></span>`;
   }
-  return `<span class="energy-label">Energy</span> ${dots}`;
+  return gems;
 }
 
 function renderStatuses(actor) {
