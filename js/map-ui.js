@@ -36,6 +36,7 @@ function renderMap() {
 // === DEBUG: Draggable nodes ===
 let _dragTarget = null;
 let _dragOffset = { x: 0, y: 0 };
+let _didDrag = false;
 
 function initDragListeners() {
   if (!MAP_DEBUG) return;
@@ -61,19 +62,20 @@ function initDragListeners() {
     e.preventDefault();
     e.stopPropagation();
     _dragTarget = node;
+    _didDrag = false;
     const pos = getCanvasPos(e);
     const nodeLeft = parseFloat(node.style.left) || 0;
     const nodeTop = parseFloat(node.style.top) || 0;
     _dragOffset.x = pos.x - nodeLeft;
     _dragOffset.y = pos.y - nodeTop;
     node.style.zIndex = '100';
-    // Disable scrolling during drag
     viewport.style.overflow = 'hidden';
   });
 
   document.addEventListener('mousemove', (e) => {
     if (!_dragTarget) return;
     e.preventDefault();
+    _didDrag = true;
     const canvasRect = canvas.getBoundingClientRect();
     const x = e.clientX - canvasRect.left + viewport.scrollLeft - _dragOffset.x;
     const y = e.clientY - canvasRect.top + viewport.scrollTop - _dragOffset.y;
@@ -107,6 +109,7 @@ function initDragListeners() {
     if (!node) return;
     e.preventDefault();
     _dragTarget = node;
+    _didDrag = false;
     const touch = e.touches[0];
     const pos = getCanvasPos(touch);
     const nodeLeft = parseFloat(node.style.left) || 0;
@@ -120,6 +123,7 @@ function initDragListeners() {
   document.addEventListener('touchmove', (e) => {
     if (!_dragTarget) return;
     e.preventDefault();
+    _didDrag = true;
     const touch = e.touches[0];
     const canvasRect = canvas.getBoundingClientRect();
     const x = touch.clientX - canvasRect.left + viewport.scrollLeft - _dragOffset.x;
@@ -186,7 +190,7 @@ function renderWorldLocations() {
     const isCurrent = campaign.currentLocation === id;
     const canTravel = canTravelTo(id);
 
-    if (!explored && !isCurrent) continue; // hidden in fog
+    if (!MAP_DEBUG && !explored && !isCurrent) continue; // hidden in fog (debug shows all)
 
     let stateClass = 'loc-fog';
     if (isCurrent) stateClass = 'loc-current';
@@ -206,7 +210,7 @@ function renderWorldLocations() {
         <div class="loc-node" style="${imgStyle}">
           ${!loc.image ? `<span class="loc-icon">${icon}</span>` : ''}
         </div>
-        <span class="loc-name">${visited || isCurrent ? loc.name : '???'}</span>
+        <span class="loc-name">${MAP_DEBUG || visited || isCurrent ? loc.name : '???'}</span>
       </div>
     `;
   }
@@ -231,10 +235,10 @@ function renderWorldPaths() {
   let paths = '';
 
   for (const [id, loc] of Object.entries(WORLD.locations)) {
-    if (!campaign.explored.has(id)) continue;
+    if (!MAP_DEBUG && !campaign.explored.has(id)) continue;
 
     for (const connId of (loc.paths || [])) {
-      if (!campaign.explored.has(connId)) continue;
+      if (!MAP_DEBUG && !campaign.explored.has(connId)) continue;
 
       const key = [id, connId].sort().join('-');
       if (drawn.has(key)) continue;
@@ -351,9 +355,13 @@ function renderLocationPanel() {
 }
 
 function onLocationTap(locId) {
+  // Suppress click if we just finished dragging (debug mode)
+  if (MAP_DEBUG && _didDrag) {
+    _didDrag = false;
+    return;
+  }
   if (locId === gameState.campaign.currentLocation) {
-    // Already here — show panel
-    renderGame();
+    // Already here — no need to re-render
     return;
   }
   doTravel(locId);
