@@ -104,6 +104,37 @@ const AI_ENEMIES = [
     ],
   },
 
+  // === COAST-SPECIFIC ===
+  {
+    id: 'coastal_serpent',
+    name: 'Coastal Serpent',
+    element: ELEMENTS.WATER,
+    hp: 50,
+    maxHp: 50,
+    image: 'images/enemy_storm_wyrm.png',
+    // Elite coast enemy — fast and hits hard
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 16, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 8, weight: 2 },
+    ],
+  },
+  {
+    id: 'storm_drake',
+    name: 'Storm Drake',
+    element: ELEMENTS.AIR,
+    hp: 60,
+    maxHp: 60,
+    image: 'images/enemy_ember_titan.png',
+    // Mini-boss — mixes everything, tests your deck
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 1 }], weight: 1 },
+    ],
+  },
+
   // === BOSS ===
   {
     id: 'ancient_dragon',

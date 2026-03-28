@@ -1,109 +1,161 @@
-// Procedural branching map — Slay the Spire style
+// World map data, locations, fog of war, and navigation
 
-const NODE_TYPES = {
+const LOC_TYPES = {
   BATTLE: 'battle',
   ELITE: 'elite',
+  MINI_BOSS: 'mini_boss',
+  BOSS: 'boss',
   REST: 'rest',
   SHOP: 'shop',
   EVENT: 'event',
-  BOSS: 'boss',
+  NPC: 'npc',
+  TREASURE: 'treasure',
 };
 
-const NODE_ICONS = {
-  [NODE_TYPES.BATTLE]: '⚔️',
-  [NODE_TYPES.ELITE]: '💀',
-  [NODE_TYPES.REST]: '🔥',
-  [NODE_TYPES.SHOP]: '🛒',
-  [NODE_TYPES.EVENT]: '❓',
-  [NODE_TYPES.BOSS]: '🐉',
+const LOC_ICONS = {
+  [LOC_TYPES.BATTLE]: '⚔️',
+  [LOC_TYPES.ELITE]: '💀',
+  [LOC_TYPES.MINI_BOSS]: '🐲',
+  [LOC_TYPES.BOSS]: '🐉',
+  [LOC_TYPES.REST]: '🔥',
+  [LOC_TYPES.SHOP]: '🛒',
+  [LOC_TYPES.EVENT]: '❓',
+  [LOC_TYPES.NPC]: '💬',
+  [LOC_TYPES.TREASURE]: '💎',
 };
 
-// Map generation config
-const MAP_CONFIG = {
-  acts: 4,            // 4 rows of choices before the boss
-  nodesPerAct: 3,     // 3 nodes per row
-  connectionsMin: 1,  // each node connects to at least 1 in next act
-  connectionsMax: 2,  // and at most 2
+// Tile size for positioning (pixels per grid unit)
+const TILE_SIZE = 80;
+
+// === WORLD DEFINITION ===
+
+const WORLD = {
+  biomes: {
+    coast: {
+      name: 'Whispering Coast',
+      description: 'Fog rolls across rocky shores. The corruption has not yet reached here — but the signs are growing.',
+      cardPool: ['water_bolt', 'tidal_wave', 'ice_barrier', 'healing_rain', 'cleanse', 'dragon_claw', 'dragon_scales', 'flame_shield'],
+      enemyPool: ['young_drake', 'coastal_serpent'],
+      elitePool: ['coastal_serpent'],
+      palette: { bg: '#0d1b2a', path: 'rgba(74, 122, 154, 0.4)', accent: '#4a7a9a' },
+    },
+  },
+
+  locations: {
+    // === WHISPERING COAST ===
+    starting_village: {
+      name: 'Starting Village',
+      biome: 'coast',
+      type: LOC_TYPES.NPC,
+      x: 2, y: 8,
+      paths: ['fishermans_cove'],
+      description: 'A quiet fishing village at the edge of the world. The elder waits by the fire.',
+      image: 'images/loc_village.png',
+      npc: {
+        name: 'Village Elder',
+        image: 'images/npc_elder.png',
+        icon: '👴',
+        dialogue: [
+          'Welcome, traveler. Strange things stir in the east.',
+          'An ancient dragon has awakened deep in the volcanic heart of our islands.',
+          'Its corruption spreads — the fog, the dead fish, the twisted creatures.',
+          'You must journey inland. Seek the old temples. Find a way to stop it.',
+          'Take this advice: build your strength before facing the darkness.',
+        ],
+      },
+    },
+    fishermans_cove: {
+      name: "Fisherman's Cove",
+      biome: 'coast',
+      type: LOC_TYPES.BATTLE,
+      x: 4, y: 6,
+      paths: ['starting_village', 'sea_cave', 'shore_market'],
+      description: 'Nets lie torn on the rocks. Something lurks in the shallows.',
+      image: 'images/loc_misty_shore.png',
+      enemy: 'young_drake',
+      goldReward: 10,
+    },
+    sea_cave: {
+      name: 'Sea Cave',
+      biome: 'coast',
+      type: LOC_TYPES.EVENT,
+      x: 3, y: 4,
+      paths: ['fishermans_cove', 'lighthouse'],
+      description: 'A dark cave mouth gapes in the cliff face. Strange sounds echo from within.',
+      image: 'images/loc_crystal_cave.png',
+      eventKey: 'sea_cave_event',
+    },
+    shore_market: {
+      name: 'Shore Market',
+      biome: 'coast',
+      type: LOC_TYPES.SHOP,
+      x: 6, y: 7,
+      paths: ['fishermans_cove', 'tide_pools', 'driftwood_camp'],
+      description: 'A few merchants still trade here, despite the dangers.',
+      image: 'images/loc_village.png',
+    },
+    lighthouse: {
+      name: 'Lighthouse',
+      biome: 'coast',
+      type: LOC_TYPES.ELITE,
+      x: 2, y: 2,
+      paths: ['sea_cave', 'tide_pools'],
+      description: 'The light has gone dark. A powerful creature has claimed the tower.',
+      image: 'images/loc_dragons_lair.png',
+      enemy: 'coastal_serpent',
+      goldReward: 20,
+    },
+    tide_pools: {
+      name: 'Tide Pools',
+      biome: 'coast',
+      type: LOC_TYPES.REST,
+      x: 5, y: 3,
+      paths: ['lighthouse', 'shore_market', 'coast_end'],
+      description: 'Warm pools among the rocks. A good place to rest and prepare.',
+      image: 'images/loc_wanderers_camp.png',
+    },
+    driftwood_camp: {
+      name: 'Driftwood Camp',
+      biome: 'coast',
+      type: LOC_TYPES.BATTLE,
+      x: 8, y: 6,
+      paths: ['shore_market', 'coast_end'],
+      description: 'Wreckage from ships piles high. Creatures nest among the debris.',
+      image: 'images/loc_misty_shore.png',
+      enemy: 'young_drake',
+      goldReward: 12,
+    },
+    coast_end: {
+      name: 'Storm Bluff',
+      biome: 'coast',
+      type: LOC_TYPES.MINI_BOSS,
+      x: 8, y: 3,
+      paths: ['tide_pools', 'driftwood_camp'],
+      description: 'The path ends at a windswept cliff. A powerful drake guards the passage to the forest beyond.',
+      image: 'images/loc_volcano_peak.png',
+      enemy: 'storm_drake',
+      goldReward: 25,
+      blessing: 'tide_walker',
+    },
+  },
 };
 
-// Act templates — what types of nodes appear at each act level
-const ACT_TEMPLATES = [
-  // Act 1: Must fight (at least one battle guaranteed by variety check)
-  [
-    { type: NODE_TYPES.BATTLE, weight: 5 },
-    { type: NODE_TYPES.EVENT, weight: 1 },
-  ],
-  // Act 2: Mix with first elite opportunity
-  [
-    { type: NODE_TYPES.BATTLE, weight: 2 },
-    { type: NODE_TYPES.ELITE, weight: 1 },
-    { type: NODE_TYPES.SHOP, weight: 2 },
-    { type: NODE_TYPES.EVENT, weight: 1 },
-  ],
-  // Act 3: Tougher, rest available
-  [
-    { type: NODE_TYPES.BATTLE, weight: 2 },
-    { type: NODE_TYPES.ELITE, weight: 2 },
-    { type: NODE_TYPES.REST, weight: 2 },
-  ],
-  // Act 4: Final prep before boss
-  [
-    { type: NODE_TYPES.REST, weight: 2 },
-    { type: NODE_TYPES.SHOP, weight: 2 },
-    { type: NODE_TYPES.ELITE, weight: 1 },
-  ],
-];
+// === EVENTS ===
 
-// Enemy pools per difficulty tier
-const ENEMY_POOLS = {
-  easy: ['young_drake', 'flame_serpent'],
-  medium: ['thornback', 'storm_caller'],
-  elite: ['iron_golem', 'shadow_wyrm'],
-  boss: ['ancient_dragon'],
-};
-
-// Event definitions
 const EVENTS = {
-  ancient_shrine: {
-    title: 'Ancient Shrine',
-    description: 'A weathered shrine hums with power. An offering might yield something extraordinary.',
+  sea_cave_event: {
+    title: 'The Sea Cave',
+    description: 'Phosphorescent algae casts an eerie blue glow. Deep inside, you find a shrine and a sealed chest.',
     choices: [
-      { text: 'Offer 6 HP', cost: { hp: 6 }, reward: { rareCard: true }, result: 'Power surges into a new card.' },
-      { text: 'Pray for healing', cost: null, reward: { heal: 10 }, result: 'Warm light washes over you.' },
-      { text: 'Walk away', cost: null, reward: null, result: 'You leave the shrine undisturbed.' },
-    ],
-  },
-  wandering_merchant: {
-    title: 'Wandering Merchant',
-    description: '"I have rare wares, traveler — but they come at a price."',
-    choices: [
-      { text: 'Buy a rare card (15 gold)', cost: { gold: 15 }, reward: { rareCard: true }, result: 'An extraordinary card changes hands.' },
-      { text: 'Remove a card for free', cost: null, reward: { removeCard: true }, result: '"A wise choice. Lighter decks, faster draws."' },
-      { text: 'Decline', cost: null, reward: null, result: 'The merchant nods and disappears into the mist.' },
-    ],
-  },
-  dragon_egg: {
-    title: 'Dragon Egg',
-    description: 'A pulsing dragon egg sits in a nest of embers. It radiates heat.',
-    choices: [
-      { text: 'Take the egg (gain a rare card)', cost: null, reward: { rareCard: true }, result: 'The egg hatches into a burst of flame. New power courses through you.' },
-      { text: 'Warm yourself (heal 8 HP)', cost: null, reward: { heal: 8 }, result: 'The warmth soothes your wounds.' },
-    ],
-  },
-  cursed_chest: {
-    title: 'Cursed Chest',
-    description: 'A chest wrapped in dark chains. Great power lies within — but at what cost?',
-    choices: [
-      { text: 'Open it (rare card + lose 10 HP)', cost: { hp: 10 }, reward: { rareCard: true }, result: 'Agony and power, intertwined.' },
-      { text: 'Leave it sealed', cost: null, reward: null, result: 'Wisdom over greed.' },
+      { text: 'Open the chest (risk)', cost: { hp: 5 }, reward: { rareCard: true }, result: 'The chest\'s guardian spirit lashes out — but you claim the power within.' },
+      { text: 'Pray at the shrine', cost: null, reward: { heal: 12 }, result: 'The shrine\'s warmth washes over you, mending your wounds.' },
+      { text: 'Leave carefully', cost: null, reward: null, result: 'You retreat from the cave. Some treasures aren\'t worth the risk.' },
     ],
   },
 };
 
-const EVENT_KEYS = Object.keys(EVENTS);
+// === SHOP ===
 
-// Shop card pool
-// Shop offers BOTH regular cards AND rare cards (for more gold)
 const SHOP_CARDS = [
   { templateKey: 'fire_blast', price: 8 },
   { templateKey: 'tidal_wave', price: 8 },
@@ -127,236 +179,152 @@ const CARD_REMOVE_PRICE = 6;
 const SHOP_HEAL_PRICE = 5;
 const SHOP_HEAL_AMOUNT = 10;
 
-// Rare cards (from elites, events, treasure)
+// === RARE CARDS ===
+
 const RARE_CARD_TEMPLATES = {
   dragon_fury: {
-    name: 'Dragon Fury',
-    type: CARD_TYPES.ATTACK,
-    element: null,
-    cost: 2,
-    damage: 20,
-    block: 0,
+    name: 'Dragon Fury', type: CARD_TYPES.ATTACK, element: null,
+    cost: 2, damage: 20, block: 0,
     effects: [{ type: 'vulnerable', value: 1, duration: 2 }],
     description: 'Deal 20 damage. Apply Vulnerable 2t.',
-    image: 'images/card_dragon_breath.png',
-    rarity: 'rare',
+    image: 'images/card_dragon_breath.png', rarity: 'rare',
   },
   ancient_ward: {
-    name: 'Ancient Ward',
-    type: CARD_TYPES.BLOCK,
-    element: null,
-    cost: 1,
-    damage: 0,
-    block: 14,
+    name: 'Ancient Ward', type: CARD_TYPES.BLOCK, element: null,
+    cost: 1, damage: 0, block: 14,
     effects: [{ type: 'thorns', value: 3, duration: 3 }],
     description: 'Gain 14 Block. Gain 3 Thorns 3t.',
-    image: 'images/card_dragon_scales.png',
-    rarity: 'rare',
+    image: 'images/card_dragon_scales.png', rarity: 'rare',
   },
   elemental_surge: {
-    name: 'Elemental Surge',
-    type: CARD_TYPES.SKILL,
-    element: null,
-    cost: 0,
-    damage: 0,
-    block: 0,
+    name: 'Elemental Surge', type: CARD_TYPES.SKILL, element: null,
+    cost: 0, damage: 0, block: 0,
     effects: [{ type: 'gainEnergy', value: 2 }, { type: 'draw', value: 2 }],
     description: 'Gain 2 Energy. Draw 2 cards.',
-    image: 'images/card_second_wind.png',
-    rarity: 'rare',
+    image: 'images/card_second_wind.png', rarity: 'rare',
   },
   dragons_bane: {
-    name: "Dragon's Bane",
-    type: CARD_TYPES.ATTACK,
-    element: null,
-    cost: 1,
-    damage: 12,
-    block: 4,
-    effects: [],
+    name: "Dragon's Bane", type: CARD_TYPES.ATTACK, element: null,
+    cost: 1, damage: 12, block: 4, effects: [],
     description: 'Deal 12 damage. Gain 4 Block.',
-    image: 'images/card_dragon_claw.png',
-    rarity: 'rare',
+    image: 'images/card_dragon_claw.png', rarity: 'rare',
   },
 };
 
-// Items (kept for quest compatibility but simplified)
+// === ITEMS (for compatibility) ===
 const ITEMS = {};
-
-// === PROCEDURAL MAP GENERATION ===
-
-function generateMap() {
-  const map = {
-    acts: [],   // acts[actIndex] = array of nodes
-    boss: null, // final boss node
-  };
-
-  for (let act = 0; act < MAP_CONFIG.acts; act++) {
-    const actNodes = [];
-    const template = ACT_TEMPLATES[act];
-
-    for (let i = 0; i < MAP_CONFIG.nodesPerAct; i++) {
-      const type = weightedPick(template);
-      const node = createMapNode(type, act, i);
-      actNodes.push(node);
-    }
-
-    // Ensure variety — no act has all the same type
-    const types = new Set(actNodes.map(n => n.type));
-    if (types.size === 1 && actNodes.length > 1) {
-      const altType = template.find(t => t.type !== actNodes[0].type);
-      if (altType) actNodes[1].type = altType.type;
-    }
-
-    map.acts.push(actNodes);
-  }
-
-  // Generate connections (each node connects to 1-2 nodes in next act)
-  for (let act = 0; act < MAP_CONFIG.acts - 1; act++) {
-    const currentAct = map.acts[act];
-    const nextAct = map.acts[act + 1];
-
-    // Ensure every node in next act is reachable
-    const reached = new Set();
-    for (const node of currentAct) {
-      const numConn = 1 + Math.floor(Math.random() * MAP_CONFIG.connectionsMax);
-      node.connections = [];
-      for (let c = 0; c < numConn && c < nextAct.length; c++) {
-        const targetIdx = (currentAct.indexOf(node) + c) % nextAct.length;
-        node.connections.push(targetIdx);
-        reached.add(targetIdx);
-      }
-    }
-    // Ensure unreached nodes get at least one connection
-    for (let i = 0; i < nextAct.length; i++) {
-      if (!reached.has(i)) {
-        const randomParent = currentAct[Math.floor(Math.random() * currentAct.length)];
-        randomParent.connections.push(i);
-      }
-    }
-  }
-
-  // Last act connects to boss
-  map.boss = {
-    type: NODE_TYPES.BOSS,
-    enemy: 'ancient_dragon',
-    act: MAP_CONFIG.acts,
-    index: 0,
-    visited: false,
-  };
-  for (const node of map.acts[MAP_CONFIG.acts - 1]) {
-    node.connections = [0]; // all connect to boss
-  }
-
-  return map;
-}
-
-function createMapNode(type, act, index) {
-  const node = {
-    type,
-    act,
-    index,
-    visited: false,
-    connections: [],
-  };
-
-  // Assign enemy based on type and act
-  if (type === NODE_TYPES.BATTLE) {
-    const pool = act < 2 ? ENEMY_POOLS.easy : ENEMY_POOLS.medium;
-    node.enemy = pool[Math.floor(Math.random() * pool.length)];
-    node.goldReward = 10 + act * 5;
-  } else if (type === NODE_TYPES.ELITE) {
-    node.enemy = ENEMY_POOLS.elite[Math.floor(Math.random() * ENEMY_POOLS.elite.length)];
-    node.goldReward = 20 + act * 5;
-  } else if (type === NODE_TYPES.EVENT) {
-    node.eventKey = EVENT_KEYS[Math.floor(Math.random() * EVENT_KEYS.length)];
-  }
-
-  return node;
-}
-
-function weightedPick(options) {
-  const totalWeight = options.reduce((s, o) => s + o.weight, 0);
-  let roll = Math.random() * totalWeight;
-  for (const opt of options) {
-    roll -= opt.weight;
-    if (roll <= 0) return opt.type;
-  }
-  return options[0].type;
-}
 
 // === CAMPAIGN STATE ===
 
 function createCampaignState() {
+  const explored = new Set();
+  const visited = new Set();
+
+  // Start at starting_village, explore it and its connections
+  const startId = 'starting_village';
+  explored.add(startId);
+  visited.add(startId);
+  const startLoc = WORLD.locations[startId];
+  if (startLoc && startLoc.paths) {
+    startLoc.paths.forEach(id => explored.add(id));
+  }
+
   return {
-    map: generateMap(),
-    currentAct: 0,
-    currentNode: null, // null = haven't chosen first node yet
+    explored,     // visible on map
+    visited,      // player has been here
+    cleared: new Set(), // battle/event completed
+    currentLocation: startId,
     gold: 0,
-    inventory: [],
+    blessings: {},
   };
 }
 
-function getAvailableNodes() {
-  const campaign = gameState.campaign;
+// === NAVIGATION ===
 
-  // Already past the boss
-  if (campaign.currentAct > MAP_CONFIG.acts) return [];
-
-  // At boss level
-  if (campaign.currentAct >= MAP_CONFIG.acts) {
-    return [campaign.map.boss];
-  }
-
-  // First pick of the game or after advancing
-  if (campaign.currentNode === null) {
-    if (campaign._lastConnections && campaign.currentAct > 0) {
-      // Use connections from previous node to filter this act's nodes
-      const actNodes = campaign.map.acts[campaign.currentAct];
-      if (!actNodes) return [campaign.map.boss];
-      return campaign._lastConnections
-        .map(idx => actNodes[idx])
-        .filter(n => n != null);
-    }
-    // Very first pick — all act 0 nodes
-    return campaign.map.acts[0] || [];
-  }
-
-  // Shouldn't reach here normally (currentNode set means we're mid-node)
-  return [];
+function isExplored(locId) {
+  return gameState.campaign.explored.has(locId);
 }
 
-function getCurrentMapNode() {
-  const campaign = gameState.campaign;
-  if (campaign.currentNode === null) return null;
-  if (campaign.currentAct >= MAP_CONFIG.acts) return campaign.map.boss;
-  return campaign.map.acts[campaign.currentAct][campaign.currentNode];
+function isVisited(locId) {
+  return gameState.campaign.visited.has(locId);
 }
 
-function selectMapNode(actIndex, nodeIndex) {
-  const campaign = gameState.campaign;
-  campaign.currentAct = actIndex;
-  campaign.currentNode = nodeIndex;
-
-  const node = actIndex >= MAP_CONFIG.acts
-    ? campaign.map.boss
-    : campaign.map.acts[actIndex][nodeIndex];
-  node.visited = true;
-
-  return node;
+function isCleared(locId) {
+  return gameState.campaign.cleared.has(locId);
 }
 
-function advanceToNextAct() {
-  // Save connections from current node before advancing
-  const current = getCurrentMapNode();
-  if (current && current.connections) {
-    gameState.campaign._lastConnections = current.connections;
+function canTravelTo(locId) {
+  const campaign = gameState.campaign;
+  const currentLoc = WORLD.locations[campaign.currentLocation];
+  if (!currentLoc) return false;
+
+  // Must be connected to current location
+  if (!currentLoc.paths.includes(locId)) return false;
+
+  // Must be explored
+  if (!campaign.explored.has(locId)) return false;
+
+  // Check blessing requirements (for future biome gating)
+  const targetLoc = WORLD.locations[locId];
+  if (targetLoc && targetLoc.requiresBlessing) {
+    if (!campaign.blessings[targetLoc.requiresBlessing]) return false;
   }
-  gameState.campaign.currentAct++;
-  gameState.campaign.currentNode = null; // reset — will be set when next node is picked
+
+  return true;
+}
+
+function travelTo(locId) {
+  if (!canTravelTo(locId)) return false;
+
+  const campaign = gameState.campaign;
+  campaign.currentLocation = locId;
+  campaign.visited.add(locId);
+
+  // Reveal connected locations
+  const loc = WORLD.locations[locId];
+  if (loc && loc.paths) {
+    loc.paths.forEach(id => campaign.explored.add(id));
+  }
+
+  return true;
+}
+
+function clearLocation(locId) {
+  gameState.campaign.cleared.add(locId);
+}
+
+function getConnectedLocations() {
+  const currentLoc = WORLD.locations[gameState.campaign.currentLocation];
+  if (!currentLoc) return [];
+  return currentLoc.paths
+    .filter(id => WORLD.locations[id])
+    .map(id => ({ id, ...WORLD.locations[id] }));
+}
+
+function getLocationPixelPos(loc) {
+  return {
+    x: loc.x * TILE_SIZE,
+    y: loc.y * TILE_SIZE,
+  };
+}
+
+// === REWARD HELPERS ===
+
+function getBiomeCardPool(biomeId) {
+  const biome = WORLD.biomes[biomeId];
+  if (!biome || !biome.cardPool) return Object.keys(CARD_TEMPLATES);
+  return biome.cardPool;
+}
+
+function getBiomeRewardCards(biomeId, count) {
+  const pool = getBiomeCardPool(biomeId);
+  const picked = shuffleArray(pool).slice(0, count || 3);
+  return picked.map(key => {
+    try { return createCard(key); } catch (e) { return null; }
+  }).filter(c => c !== null);
 }
 
 function getAvailableShopCards() {
-  // Mix of 3 regular + 1 rare
   const regular = shuffleArray(SHOP_CARDS).slice(0, 3).map(item => ({
     card: createCard(item.templateKey),
     price: item.price,
@@ -372,6 +340,12 @@ function getAvailableShopCards() {
   return [...regular, ...rare];
 }
 
+function getRareCard() {
+  const keys = Object.keys(RARE_CARD_TEMPLATES);
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  return getRareCardByKey(key);
+}
+
 function getRareCardByKey(key) {
   const template = RARE_CARD_TEMPLATES[key];
   if (!template) return null;
@@ -383,14 +357,20 @@ function getRareCardByKey(key) {
   };
 }
 
-function getRareCard() {
-  const keys = Object.keys(RARE_CARD_TEMPLATES);
-  const key = keys[Math.floor(Math.random() * keys.length)];
-  const template = RARE_CARD_TEMPLATES[key];
-  return {
-    ...template,
-    templateKey: key,
-    id: _cardId++,
-    effects: template.effects.map(e => ({ ...e })),
-  };
+// Kept for simulator compatibility
+function getAvailableNodes() {
+  return getConnectedLocations().filter(loc => canTravelTo(loc.id));
+}
+
+function getCurrentMapNode() {
+  const locId = gameState.campaign.currentLocation;
+  return WORLD.locations[locId] || null;
+}
+
+function advanceToNextAct() {
+  // No-op in world map (kept for compatibility)
+}
+
+function advanceAfterNode() {
+  returnToMap();
 }

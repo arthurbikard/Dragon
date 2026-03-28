@@ -109,6 +109,11 @@ function returnToMap() {
   gameState.phase = GAME_PHASES.MAP;
   gameState.selectedCardIndex = null;
   renderGame();
+  // After render, draw paths and scroll to player
+  requestAnimationFrame(() => {
+    renderWorldPaths();
+    scrollToCurrentLocation();
+  });
 }
 
 function startPVPGame(element1, element2) {
@@ -534,6 +539,10 @@ function handleDeath() {
       // Enemy defeated
       const node = getCurrentMapNode();
 
+      // Mark location cleared
+      const locId = gameState._battleLocationId;
+      if (locId) clearLocation(locId);
+
       // Grant gold
       const goldReward = gameState._battleGoldReward || 0;
       if (goldReward > 0) {
@@ -541,20 +550,30 @@ function handleDeath() {
         addLog(`Earned ${goldReward} gold.`);
       }
 
+      // Mini-boss: grant blessing
+      if (gameState._miniBossBlessing) {
+        gameState.campaign.blessings[gameState._miniBossBlessing] = true;
+        addLog(`Gained blessing: ${gameState._miniBossBlessing}!`);
+        gameState._miniBossBlessing = null;
+      }
+
       // Boss defeated = victory
-      if (node && node.type === NODE_TYPES.BOSS) {
+      const loc = locId ? WORLD.locations[locId] : null;
+      if (loc && loc.type === LOC_TYPES.BOSS) {
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
         return;
       }
 
-      // Elite gives 2 rare cards + bonus gold
+      // Generate rewards based on biome
+      const biomeId = loc ? loc.biome : null;
+
       if (gameState._battleIsElite) {
-        gameState._rewardCards = [getRareCard(), getRareCard(), ...getRewardCards(1)];
-        gameState.campaign.gold += 10; // bonus gold
+        gameState._rewardCards = [getRareCard(), getRareCard(), ...getBiomeRewardCards(biomeId, 1)];
+        gameState.campaign.gold += 10;
         addLog('Elite defeated! Bonus gold earned.');
       } else {
-        gameState._rewardCards = getRewardCards(3);
+        gameState._rewardCards = getBiomeRewardCards(biomeId, 3);
       }
 
       gameState.phase = GAME_PHASES.CARD_REWARD;
@@ -591,9 +610,6 @@ function skipReward() {
 }
 
 function advanceAfterNode() {
-  if (gameState.campaign) {
-    advanceToNextAct();
-  }
   returnToMap();
 }
 
