@@ -107,10 +107,13 @@ function renderBattle() {
   const actor = getCurrentActor();
   const canAct = isPVP || isPlayerTurn;
 
+  const lastLog = gameState.log.length ? gameState.log[gameState.log.length - 1] : '';
+
   return `
     <div class="screen battle-screen">
       ${renderEnemyArea(topCombatant)}
-      ${renderBattlefield(bottomCombatant, canAct)}
+      <div class="combat-log">${lastLog ? `<span class="log-entry">${lastLog}</span>` : ''}</div>
+      ${renderPlayerBar(bottomCombatant, canAct)}
       ${renderHand(actor, canAct)}
       ${renderBottomBar(actor, canAct)}
     </div>
@@ -120,9 +123,6 @@ function renderBattle() {
 function renderEnemyArea(e) {
   const hpPercent = (e.hp / e.maxHp) * 100;
   const isAI = gameState.mode === GAME_MODES.AI;
-  const intentHtml = isAI && gameState.enemy.nextIntent
-    ? `<div class="intent">${renderIntent(gameState.enemy.nextIntent)}</div>`
-    : '';
 
   let label;
   if (isAI) {
@@ -131,27 +131,33 @@ function renderEnemyArea(e) {
     label = gameState.currentTurn === 'player' ? 'Player 2' : 'Player 1';
   }
 
-  const bannerBg = e.image
+  const portraitStyle = e.image
     ? `background-image: url('${e.image}')`
     : `background: ${e.element ? ELEMENT_COLORS[e.element].bg : '#333'}`;
 
+  const intentHtml = isAI && gameState.enemy.nextIntent
+    ? `<div class="intent-row">
+        <span class="intent-label">Next:</span>
+        ${renderIntent(gameState.enemy.nextIntent)}
+       </div>`
+    : '';
+
   return `
     <div class="enemy-area">
-      <div class="enemy-banner" style="${bannerBg}">
-        ${intentHtml}
-        <div class="enemy-info">
-          <div class="combatant-header">
-            <span class="combatant-name">${label}</span>
-            ${renderStatuses(e)}
-          </div>
-          <div class="enemy-meta">
-            <div class="hp-bar-container">
-              <div class="hp-bar hp-bar-enemy" style="width: ${hpPercent}%"></div>
-              <span class="hp-text">${e.hp} / ${e.maxHp}</span>
-            </div>
-            ${e.block > 0 ? `<div class="block-badge">🛡 ${e.block}</div>` : ''}
-          </div>
+      <div class="enemy-portrait ${e.image ? '' : 'enemy-portrait-fallback'}" style="${portraitStyle}">
+        ${e.image ? '' : `<span>${e.element ? ELEMENT_ICONS[e.element] : '🐉'}</span>`}
+      </div>
+      <div class="enemy-stats">
+        <div class="enemy-header">
+          <span class="combatant-name">${label}</span>
+          ${renderStatuses(e)}
+          ${e.block > 0 ? `<span class="block-badge">🛡 ${e.block}</span>` : ''}
         </div>
+        <div class="hp-bar-container">
+          <div class="hp-bar hp-bar-enemy" style="width: ${hpPercent}%"></div>
+          <span class="hp-text">${e.hp} / ${e.maxHp}</span>
+        </div>
+        ${intentHtml}
       </div>
     </div>
   `;
@@ -172,12 +178,8 @@ function renderIntent(intent) {
   }
 }
 
-function renderBattlefield(p, canAct) {
+function renderPlayerBar(p, canAct) {
   const hpPercent = (p.hp / p.maxHp) * 100;
-  const recent = gameState.log.slice(-2);
-  const logHtml = recent.length
-    ? recent.map(msg => `<div class="log-entry">${msg}</div>`).join('')
-    : '<div class="log-entry log-empty">Your turn</div>';
 
   let label;
   if (gameState.mode === GAME_MODES.AI) {
@@ -186,34 +188,24 @@ function renderBattlefield(p, canAct) {
     label = gameState.currentTurn === 'player' ? 'Player 1' : 'Player 2';
   }
 
-  const battleNum = gameState.mode === GAME_MODES.AI
-    ? `<span class="bf-battle-num">${gameState.battleIndex + 1}/3</span>`
-    : '';
-
   return `
-    <div class="battlefield">
-      <div class="bf-row">
-        <div class="bf-player">
-          <div class="bf-player-icon" style="background: ${ELEMENT_COLORS[p.element].bg}">
-            ${ELEMENT_ICONS[p.element]}
-          </div>
-          <div class="bf-player-header">
-            <span class="combatant-name">${label}</span>
-            ${renderStatuses(p)}
-            ${p.block > 0 ? `<span class="block-badge">🛡 ${p.block}</span>` : ''}
-          </div>
-        </div>
-        ${battleNum}
-        <div class="energy-display">
-          ${renderEnergy(canAct ? getCurrentActor().energy : 0)}
-        </div>
+    <div class="player-bar">
+      <div class="player-bar-icon" style="background: ${ELEMENT_COLORS[p.element].bg}">
+        ${ELEMENT_ICONS[p.element]}
       </div>
-      <div class="bf-row">
+      <div class="player-bar-info">
+        <div class="player-bar-header">
+          <span class="combatant-name">${label}</span>
+          ${renderStatuses(p)}
+          ${p.block > 0 ? `<span class="block-badge">🛡 ${p.block}</span>` : ''}
+        </div>
         <div class="hp-bar-container">
           <div class="hp-bar hp-bar-player" style="width: ${hpPercent}%"></div>
           <span class="hp-text">${p.hp} / ${p.maxHp}</span>
         </div>
-        <div class="bf-feed">${logHtml}</div>
+      </div>
+      <div class="energy-display">
+        ${renderEnergy(canAct ? getCurrentActor().energy : 0)}
       </div>
     </div>
   `;
@@ -316,10 +308,13 @@ function renderCard(card, index, canAct) {
 function renderBottomBar(actor, canAct) {
   const deckCount = actor.deck ? actor.deck.length : 0;
   const discardCount = actor.discard ? actor.discard.length : 0;
+  const battleNum = gameState.mode === GAME_MODES.AI
+    ? `<span class="deck-count">${gameState.battleIndex + 1}/3</span>` : '';
 
   return `
     <div class="bottom-bar">
       <div class="deck-info">
+        ${battleNum}
         <span class="deck-count">Deck ${deckCount}</span>
         <span class="discard-count">Discard ${discardCount}</span>
       </div>
