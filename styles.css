@@ -1239,6 +1239,7 @@ html, body {
 /* Scrollable viewport */
 .world-viewport {
   flex: 1;
+  display: block;
   overflow: scroll;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -1247,18 +1248,17 @@ html, body {
     radial-gradient(circle at 30% 40%, rgba(13, 27, 42, 0.8), transparent 60%),
     radial-gradient(circle at 70% 60%, rgba(42, 42, 68, 0.3), transparent 50%),
     var(--abyss);
-  /* Must not constrain child width */
-  min-width: 0;
+  width: 100%;
+  min-height: 0;
 }
 
 .world-viewport::-webkit-scrollbar { display: none; }
 
-/* Canvas: full world size, locations positioned absolutely */
+/* Canvas: full world size, wider than viewport to enable horizontal scroll */
 .world-canvas {
   position: relative;
-  min-width: 800px;
-  min-height: 800px;
-  width: max-content;
+  width: 900px;
+  height: 900px;
   padding: 40px;
 }
 
