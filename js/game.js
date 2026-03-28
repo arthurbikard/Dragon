@@ -78,7 +78,7 @@ function startAIGame(element) {
 }
 
 function startNodeBattle(enemyId, goldReward) {
-  gameState._battleLocationId = enemyId;
+  // _battleLocationId is already set by enterLocation() in map-ui.js
   gameState._battleGoldReward = goldReward || 0;
   gameState._battleIsElite = false;
   setupAIBattleByEnemy(enemyId);
@@ -86,7 +86,7 @@ function startNodeBattle(enemyId, goldReward) {
 }
 
 function startEliteBattle(enemyId, goldReward) {
-  gameState._battleLocationId = enemyId;
+  // _battleLocationId is already set by enterLocation() in map-ui.js
   gameState._battleGoldReward = goldReward || 0;
   gameState._battleIsElite = true;
   setupAIBattleByEnemy(enemyId);
