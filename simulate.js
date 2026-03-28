@@ -234,13 +234,17 @@ const AGENTS = {
     pickShopCard(items, gold) {
       const affordable = items.filter(i => i.price <= gold);
       if (affordable.length === 0) return -1;
-      // Buy best value
+      // Buy strongest card we can afford
       let best = affordable[0];
-      affordable.forEach(i => { if (i.card.damage > best.card.damage) best = i; });
+      let bestVal = 0;
+      affordable.forEach(i => {
+        const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+        if (val > bestVal) { bestVal = val; best = i; }
+      });
       return items.indexOf(best);
     },
     shouldRest(player) {
-      return player.hp < player.maxHp * 0.5;
+      return player.hp < player.maxHp * 0.7;
     },
   },
 

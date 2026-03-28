@@ -15,62 +15,63 @@ const INTENT_ICONS = {
 };
 
 const AI_ENEMIES = [
-  // Misty Shore: Young Drake (easy)
+  // Misty Shore: Young Drake (easy but not trivial)
   {
     id: 'young_drake',
     name: 'Young Drake',
     element: ELEMENTS.FIRE,
-    hp: 35,
-    maxHp: 35,
+    hp: 38,
+    maxHp: 38,
     image: 'images/enemy_young_drake.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 6, weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
       { type: INTENT_TYPES.DEFEND, block: 5, weight: 2 },
-      { type: INTENT_TYPES.ATTACK, damage: 4, effects: [{ type: 'burn', value: 2, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 4, effects: [{ type: 'burn', value: 2, duration: 2 }], weight: 2 },
     ],
   },
-  // Dark Forest: Forest Wyrm (medium)
+  // Dark Forest: Forest Wyrm (medium-hard)
   {
     id: 'forest_wyrm',
     name: 'Forest Wyrm',
     element: ELEMENTS.EARTH,
-    hp: 45,
-    maxHp: 45,
+    hp: 48,
+    maxHp: 48,
     image: 'images/enemy_forest_wyrm.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 14, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
       { type: INTENT_TYPES.BUFF, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
-  // Volcano Peak: Ember Titan (hard)
+  // Volcano Peak: Ember Titan (hard, burns you down)
   {
     id: 'ember_titan',
     name: 'Ember Titan',
     element: ELEMENTS.FIRE,
-    hp: 60,
-    maxHp: 60,
+    hp: 56,
+    maxHp: 56,
     image: 'images/enemy_ember_titan.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 3 }], weight: 1 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 2 }], weight: 1 },
     ],
   },
-  // Dragon's Lair: Ancient Dragon (boss)
+  // Dragon's Lair: Ancient Dragon (tough final boss)
   {
     id: 'ancient_dragon',
     name: 'Ancient Dragon',
     element: ELEMENTS.EARTH,
-    hp: 80,
-    maxHp: 80,
+    hp: 72,
+    maxHp: 72,
     image: 'images/enemy_ancient_dragon.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 3 }, { type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 11, weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 20, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 12, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 3, duration: 3 }, { type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
 ];

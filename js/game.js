@@ -20,8 +20,8 @@ const GAME_PHASES = {
 
 const MAX_ENERGY = 3;
 const DRAW_COUNT = 5;
-const STARTING_HP = 60;
-const PVP_STARTING_HP = 50;
+const STARTING_HP = 55;
+const PVP_STARTING_HP = 45;
 
 function createPlayerState(element, hp) {
   const deck = shuffleArray(createDeck(element));
