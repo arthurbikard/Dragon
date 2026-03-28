@@ -9,11 +9,29 @@ function renderGame() {
     case GAME_PHASES.ELEMENT_SELECT:
       app.innerHTML = renderElementSelect();
       break;
+    case GAME_PHASES.MAP:
+      app.innerHTML = renderMap();
+      break;
     case GAME_PHASES.BATTLE:
       app.innerHTML = renderBattle();
       break;
     case GAME_PHASES.CARD_REWARD:
       app.innerHTML = renderCardReward();
+      break;
+    case GAME_PHASES.SHOP:
+      app.innerHTML = renderShop();
+      break;
+    case GAME_PHASES.REST:
+      app.innerHTML = renderRest();
+      break;
+    case GAME_PHASES.NPC:
+      app.innerHTML = renderNpc();
+      break;
+    case GAME_PHASES.EVENT:
+      app.innerHTML = renderEvent();
+      break;
+    case GAME_PHASES.CARD_UPGRADE:
+      app.innerHTML = renderCardUpgrade();
       break;
     case GAME_PHASES.PASS_DEVICE:
       app.innerHTML = renderPassDevice();

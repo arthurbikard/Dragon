@@ -4,8 +4,14 @@ const GAME_MODES = { AI: 'ai', PVP: 'pvp' };
 const GAME_PHASES = {
   MENU: 'menu',
   ELEMENT_SELECT: 'element_select',
+  MAP: 'map',
   BATTLE: 'battle',
   CARD_REWARD: 'card_reward',
+  SHOP: 'shop',
+  REST: 'rest',
+  NPC: 'npc',
+  EVENT: 'event',
+  CARD_UPGRADE: 'card_upgrade',
   PASS_DEVICE: 'pass_device',
   PVP_RESOLVE: 'pvp_resolve',
   GAME_OVER: 'game_over',
@@ -58,10 +64,40 @@ function startAIGame(element) {
   gameState = createGameState();
   gameState.mode = GAME_MODES.AI;
   gameState.player = createPlayerState(element, STARTING_HP);
-  gameState.battleIndex = 0;
-  setupAIBattle(gameState.battleIndex);
+  gameState.campaign = createCampaignState();
+  gameState.phase = GAME_PHASES.MAP;
+  renderGame();
+}
+
+function startLocationBattle(locId) {
+  const loc = LOCATIONS[locId];
+  if (!loc.enemy) return;
+  gameState._battleLocationId = locId;
+  setupAIBattleByEnemy(loc.enemy);
   gameState.phase = GAME_PHASES.BATTLE;
+  // Reset player deck for battle
+  gameState.player.deck = shuffleArray([
+    ...gameState.player.deck,
+    ...gameState.player.discard,
+    ...gameState.player.hand,
+  ]);
+  gameState.player.discard = [];
+  gameState.player.hand = [];
+  gameState.player.block = 0;
+  gameState.player.statuses = [];
   startTurn('player');
+}
+
+function setupAIBattleByEnemy(enemyId) {
+  const enemy = createAIEnemy(enemyId);
+  gameState.enemy = enemy;
+  gameState.enemy.nextIntent = pickIntent(enemy);
+}
+
+function returnToMap() {
+  gameState.phase = GAME_PHASES.MAP;
+  gameState.selectedCardIndex = null;
+  renderGame();
 }
 
 function startPVPGame(element1, element2) {
@@ -471,12 +507,39 @@ function handleDeath() {
   if (gameState.mode === GAME_MODES.AI) {
     if (gameState.enemy.hp <= 0) {
       // Enemy defeated
-      if (gameState.battleIndex < 2) {
+      const locId = gameState._battleLocationId;
+      if (locId) {
+        // Campaign mode — handle location rewards
+        const loc = LOCATIONS[locId];
+        clearLocation(locId);
+
+        // Grant item reward
+        if (loc.rewards && loc.rewards.item) {
+          addItem(loc.rewards.item);
+        }
+        // Grant gold
+        if (loc.rewards && loc.rewards.gold) {
+          gameState.campaign.gold += loc.rewards.gold;
+          addLog(`Earned ${loc.rewards.gold} gold.`);
+        }
+
+        // Check if this is the final boss
+        if (loc.type === LOCATION_TYPES.BOSS) {
+          gameState.phase = GAME_PHASES.VICTORY;
+          renderGame();
+          return;
+        }
+
         // Offer card reward
-        gameState.phase = GAME_PHASES.CARD_REWARD;
-        gameState._rewardCards = getRewardCards(3);
-        renderGame();
+        if (loc.rewards && loc.rewards.cardReward) {
+          gameState.phase = GAME_PHASES.CARD_REWARD;
+          gameState._rewardCards = getRewardCards(3);
+          renderGame();
+        } else {
+          returnToMap();
+        }
       } else {
+        // Legacy non-campaign battle (shouldn't happen)
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
       }
@@ -493,42 +556,16 @@ function handleDeath() {
   }
 }
 
-function prepareNextBattle() {
-  // Consolidate all cards back into deck
-  gameState.player.deck = shuffleArray([
-    ...gameState.player.deck,
-    ...gameState.player.discard,
-    ...gameState.player.hand,
-  ]);
-  gameState.player.discard = [];
-  gameState.player.hand = [];
-
-  // Clear statuses and block, but KEEP current HP
-  gameState.player.block = 0;
-  gameState.player.statuses = [];
-
-  gameState.battleIndex++;
-  setupAIBattle(gameState.battleIndex);
-  gameState.phase = GAME_PHASES.BATTLE;
-  startTurn('player');
-}
-
 function pickRewardCard(index) {
   const card = gameState._rewardCards[index];
   if (!card) return;
   addLog(`Added ${card.name} to deck!`);
   gameState.player.deck.push(card);
-  prepareNextBattle();
+  returnToMap();
 }
 
 function skipReward() {
-  prepareNextBattle();
-
-  // Next battle
-  gameState.battleIndex++;
-  setupAIBattle(gameState.battleIndex);
-  gameState.phase = GAME_PHASES.BATTLE;
-  startTurn('player');
+  returnToMap();
 }
 
 function addLog(msg) {

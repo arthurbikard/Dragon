@@ -15,8 +15,9 @@ const INTENT_ICONS = {
 };
 
 const AI_ENEMIES = [
-  // Battle 1: Young Drake (easy)
+  // Misty Shore: Young Drake (easy)
   {
+    id: 'young_drake',
     name: 'Young Drake',
     element: ELEMENTS.FIRE,
     hp: 35,
@@ -28,38 +29,60 @@ const AI_ENEMIES = [
       { type: INTENT_TYPES.ATTACK, damage: 4, effects: [{ type: 'burn', value: 2, duration: 2 }], weight: 1 },
     ],
   },
-  // Battle 2: Storm Wyrm (medium)
+  // Dark Forest: Forest Wyrm (medium)
   {
-    name: 'Storm Wyrm',
-    element: ELEMENTS.AIR,
-    hp: 50,
-    maxHp: 50,
-    image: 'images/enemy_storm_wyrm.png',
+    id: 'forest_wyrm',
+    name: 'Forest Wyrm',
+    element: ELEMENTS.EARTH,
+    hp: 45,
+    maxHp: 45,
+    image: 'images/enemy_storm_wyrm.png', // reuse for now
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 15, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 8, weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
+      { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
       { type: INTENT_TYPES.BUFF, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
-  // Battle 3: Ancient Dragon (hard)
+  // Volcano Peak: Ember Titan (hard)
   {
-    name: 'Ancient Dragon',
-    element: ELEMENTS.EARTH,
-    hp: 70,
-    maxHp: 70,
-    image: 'images/enemy_ancient_dragon.png',
+    id: 'ember_titan',
+    name: 'Ember Titan',
+    element: ELEMENTS.FIRE,
+    hp: 60,
+    maxHp: 60,
+    image: 'images/enemy_young_drake.png', // reuse for now
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 10, weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 20, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 12, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 3, duration: 3 }, { type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 3 }], weight: 1 },
+    ],
+  },
+  // Dragon's Lair: Ancient Dragon (boss)
+  {
+    id: 'ancient_dragon',
+    name: 'Ancient Dragon',
+    element: ELEMENTS.EARTH,
+    hp: 80,
+    maxHp: 80,
+    image: 'images/enemy_ancient_dragon.png',
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 3 }, { type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
 ];
 
-function createAIEnemy(battleIndex) {
-  const template = AI_ENEMIES[Math.min(battleIndex, AI_ENEMIES.length - 1)];
+function createAIEnemy(indexOrId) {
+  let template;
+  if (typeof indexOrId === 'string') {
+    template = AI_ENEMIES.find(e => e.id === indexOrId);
+  } else {
+    template = AI_ENEMIES[Math.min(indexOrId, AI_ENEMIES.length - 1)];
+  }
+  if (!template) template = AI_ENEMIES[0];
   return {
     name: template.name,
     element: template.element,
