@@ -1211,6 +1211,7 @@ html, body {
   padding: 0;
   gap: 0;
   background: var(--void);
+  touch-action: auto;
 }
 
 .map-screen::after { display: none; }
@@ -1238,13 +1239,16 @@ html, body {
 /* Scrollable viewport */
 .world-viewport {
   flex: 1;
-  overflow: auto;
+  overflow: scroll;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
   background:
     radial-gradient(circle at 30% 40%, rgba(13, 27, 42, 0.8), transparent 60%),
     radial-gradient(circle at 70% 60%, rgba(42, 42, 68, 0.3), transparent 50%),
     var(--abyss);
+  /* Must not constrain child width */
+  min-width: 0;
 }
 
 .world-viewport::-webkit-scrollbar { display: none; }
@@ -1252,9 +1256,9 @@ html, body {
 /* Canvas: full world size, locations positioned absolutely */
 .world-canvas {
   position: relative;
-  /* Size set dynamically based on location positions, minimum: */
   min-width: 800px;
   min-height: 800px;
+  width: max-content;
   padding: 40px;
 }
 
