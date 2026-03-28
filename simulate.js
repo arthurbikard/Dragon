@@ -63,7 +63,7 @@ process.argv.slice(2).forEach(arg => {
 });
 
 const NUM_RUNS = parseInt(args.runs) || 100;
-const AGENT_FILTER = args.agent || 'all';
+const AGENT_FILTER = args.agent || 'default';
 const FORCE_ELEMENT = args.element || null;
 const VERBOSE = !!args.verbose;
 const JSON_OUTPUT = !!args.json;
@@ -243,6 +243,246 @@ const AGENTS = {
       return player.hp < player.maxHp * 0.5;
     },
   },
+
+  /**
+   * Expert agent: deep strategy with burn/thorns awareness, deck management,
+   * smart map routing, adaptive blocking, and deck thinning.
+   */
+  expert: {
+    name: 'Expert',
+
+    // --- Helper: score a card's total value in current battle context ---
+    _scoreCard(card, energy, actor, opponent) {
+      const intent = opponent.nextIntent;
+      const enemyAttacking = intent && (intent.type === 'attack' || intent.type === 'heavy_attack');
+      const incomingDamage = enemyAttacking ? (intent.damage || 0) : 0;
+      const unblockedDamage = Math.max(0, incomingDamage - actor.block);
+      const hpRatio = actor.hp / actor.maxHp;
+      const enemyHpRatio = opponent.hp / opponent.maxHp;
+      const vulnerable = opponent.statuses && opponent.statuses.find(s => s.type === 'vulnerable');
+
+      let score = 0;
+
+      // --- Damage value ---
+      if (card.damage > 0) {
+        let dmg = card.damage;
+        // Account for elemental advantage
+        if (card.element && opponent.element && ELEMENT_STRENGTH[card.element] === opponent.element) {
+          dmg = Math.floor(dmg * 1.5);
+        }
+        if (vulnerable) dmg = Math.floor(dmg * 1.5);
+        score += dmg * 2;
+        // Bonus for lethal damage
+        if (dmg >= opponent.hp) score += 50;
+      }
+
+      // --- Block value: scales with how much damage we'd actually take ---
+      if (card.block > 0) {
+        if (unblockedDamage > 0) {
+          // Block is worth more the more unblocked damage is incoming
+          const usefulBlock = Math.min(card.block, unblockedDamage);
+          score += usefulBlock * 3;
+          // Extra value at low HP — every point matters
+          if (hpRatio < 0.4) score += usefulBlock * 2;
+        } else {
+          // Enemy not attacking — block has minimal value
+          score += card.block * 0.3;
+        }
+      }
+
+      // --- Effect values ---
+      for (const fx of card.effects) {
+        switch (fx.type) {
+          case 'burn':
+            // Burn is free damage over time: value * duration
+            score += fx.value * fx.duration * 1.8;
+            // More valuable against high-HP enemies (boss fights)
+            if (opponent.hp > 40) score += fx.value * 2;
+            break;
+          case 'heal':
+            // Heal value scales inversely with HP
+            const missingHp = actor.maxHp - actor.hp;
+            const actualHeal = Math.min(fx.value, missingHp);
+            score += actualHeal * (hpRatio < 0.4 ? 3 : 1.5);
+            if (missingHp === 0) score -= 5; // worthless at full HP
+            break;
+          case 'draw':
+            // Drawing is always good — more options
+            score += fx.value * 4;
+            break;
+          case 'gainEnergy':
+            // Energy is worth more when we have more cards to play
+            score += fx.value * 5;
+            break;
+          case 'thorns':
+            // Thorns: value depends on how many turns the fight will last
+            // Great against enemies with frequent attacks
+            const estimatedTurnsLeft = Math.ceil(opponent.hp / 8);
+            score += fx.value * Math.min(fx.duration, estimatedTurnsLeft) * 1.5;
+            break;
+          case 'vulnerable':
+            // Making enemy vulnerable amplifies all future damage by 50%
+            score += fx.duration * 6;
+            if (enemyHpRatio > 0.5) score += 4; // more valuable early in fight
+            break;
+          case 'cleanse':
+            // Value depends on how bad our debuffs are
+            const hasBurn = actor.statuses && actor.statuses.find(s => s.type === 'burn');
+            const hasVuln = actor.statuses && actor.statuses.find(s => s.type === 'vulnerable');
+            if (hasBurn) score += hasBurn.value * hasBurn.duration * 2;
+            if (hasVuln) score += 8;
+            if (!hasBurn && !hasVuln) score -= 3; // no debuffs = worthless
+            break;
+        }
+      }
+
+      // --- Energy efficiency: prefer cheaper cards when score is similar ---
+      if (card.cost > 0) {
+        score = score / card.cost;
+      } else {
+        score += 3; // free cards get a flat bonus
+      }
+
+      return score;
+    },
+
+    pickCard(hand, energy, actor, opponent) {
+      const playable = hand.filter(c => c.cost <= energy);
+      if (playable.length === 0) return null;
+
+      // Always play energy-gain cards first to unlock more plays this turn
+      const energyGain = playable.filter(c => c.effects.some(e => e.type === 'gainEnergy'));
+      if (energyGain.length > 0) return energyGain[0];
+
+      // Always play free draw cards first (expand options)
+      const freeDraw = playable.filter(c => c.cost === 0 && c.effects.some(e => e.type === 'draw'));
+      if (freeDraw.length > 0) return freeDraw[0];
+
+      // Score all playable cards and pick the best
+      let bestCard = playable[0];
+      let bestScore = -Infinity;
+      for (const card of playable) {
+        const score = this._scoreCard(card, energy, actor, opponent);
+        if (score > bestScore) {
+          bestScore = score;
+          bestCard = card;
+        }
+      }
+      return bestCard;
+    },
+
+    pickMapAction() { return 'smart'; },
+
+    pickReward(cards) {
+      // Score each card considering what the deck needs
+      const deck = gameState.player.deck;
+      const totalDamage = deck.reduce((s, c) => s + c.damage, 0);
+      const totalBlock = deck.reduce((s, c) => s + c.block, 0);
+      const needsBlock = totalDamage > totalBlock * 2;
+      const needsDamage = totalBlock > totalDamage * 1.5;
+
+      let best = 0;
+      let bestScore = -1;
+      cards.forEach((c, i) => {
+        let score = c.damage * 1.5 + c.block * 1.2;
+
+        // Adjust for deck balance
+        if (needsBlock && c.block > 0) score += c.block * 2;
+        if (needsDamage && c.damage > 0) score += c.damage * 2;
+
+        // Value effects
+        score += c.effects.reduce((s, e) => {
+          if (e.type === 'burn') return s + e.value * e.duration * 2;
+          if (e.type === 'heal') return s + e.value * 1.5;
+          if (e.type === 'draw') return s + e.value * 4;
+          if (e.type === 'gainEnergy') return s + e.value * 5;
+          if (e.type === 'thorns') return s + e.value * e.duration * 1.5;
+          if (e.type === 'vulnerable') return s + e.duration * 5;
+          return s + 2;
+        }, 0);
+
+        // Penalize high-cost cards in a small deck (harder to play)
+        if (deck.length < 12 && c.cost >= 2) score *= 0.8;
+
+        if (score > bestScore) { bestScore = score; best = i; }
+      });
+      return best;
+    },
+
+    pickEventChoice(choices) {
+      // Take risky choice only if HP is high enough
+      const hpRatio = gameState.player.hp / gameState.player.maxHp;
+      const rewarded = choices.findIndex(c => c.reward);
+      if (rewarded >= 0 && choices[rewarded].cost) {
+        const hpCost = choices[rewarded].cost.hp || 0;
+        if (hpCost > 0 && hpRatio < 0.5) return choices.length - 1; // decline if low HP
+      }
+      return rewarded >= 0 ? rewarded : 0;
+    },
+
+    pickShopCard(items, gold) {
+      if (gold < 10) return -1; // save gold for card removal
+
+      const deck = gameState.player.deck;
+      const totalDamage = deck.reduce((s, c) => s + c.damage, 0);
+      const totalBlock = deck.reduce((s, c) => s + c.block, 0);
+      const needsBlock = totalDamage > totalBlock * 2;
+
+      const affordable = items.filter(i => i.price <= gold);
+      if (affordable.length === 0) return -1;
+
+      let best = null;
+      let bestScore = 0;
+      for (const item of affordable) {
+        let score = item.card.damage * 1.5 + item.card.block * 1.2;
+        if (needsBlock && item.card.block > 0) score += item.card.block * 2;
+        score += item.card.effects.reduce((s, e) => {
+          if (e.type === 'burn') return s + e.value * 3;
+          if (e.type === 'heal') return s + e.value * 1.5;
+          return s + 2;
+        }, 0);
+        // Value per gold
+        score = score / item.price * 10;
+        if (score > bestScore) { bestScore = score; best = item; }
+      }
+      return best ? items.indexOf(best) : -1;
+    },
+
+    shouldRest(player) {
+      // Rest if below 50%, or below 70% if about to face a tough battle
+      const hpRatio = player.hp / player.maxHp;
+      if (hpRatio < 0.5) return true;
+      // Check if next reachable battle is hard
+      if (gameState.campaign) {
+        const currentId = gameState.campaign.currentLocation;
+        const loc = LOCATIONS[currentId];
+        const nextBattles = loc.connections.filter(id => {
+          const l = LOCATIONS[id];
+          return l && (l.type === LOCATION_TYPES.BATTLE || l.type === LOCATION_TYPES.BOSS) &&
+            !gameState.campaign.locationStates[id].cleared;
+        });
+        if (nextBattles.some(id => LOCATIONS[id].type === LOCATION_TYPES.BOSS) && hpRatio < 0.8) return true;
+        if (nextBattles.length > 0 && hpRatio < 0.65) return true;
+      }
+      return false;
+    },
+
+    // Card removal: remove weakest card from deck
+    shouldRemoveCard(deck, gold) {
+      if (gold < CARD_REMOVE_PRICE) return false;
+      // Remove if deck has >10 cards and has weak starter cards
+      if (deck.length > 10) {
+        const weakest = deck.reduce((a, b) => {
+          const aScore = a.damage + a.block + a.effects.length * 3;
+          const bScore = b.damage + b.block + b.effects.length * 3;
+          return aScore < bScore ? a : b;
+        });
+        const weakScore = weakest.damage + weakest.block + weakest.effects.length * 3;
+        return weakScore < 8; // remove if the weakest card is really weak
+      }
+      return false;
+    },
+  },
 };
 
 // === Headless Simulation Engine ===
@@ -280,6 +520,8 @@ function simulateGame(agent, element) {
     gameState.player = createPlayerState(element, STARTING_HP);
     gameState.campaign = createCampaignState();
     gameState.phase = GAME_PHASES.MAP;
+    _mapVisitCount = {};
+    _mapStateKey = '';
 
     let actions = 0;
 
@@ -326,6 +568,11 @@ function simulateGame(agent, element) {
 
       if (gameState.phase === GAME_PHASES.SHOP) {
         const items = gameState._shopCards || [];
+        // Expert: consider card removal first
+        if (agent.shouldRemoveCard && agent.shouldRemoveCard(gameState.player.deck, gameState.campaign.gold)) {
+          openCardRemove();
+          continue;
+        }
         const pick = agent.pickShopCard(items, gameState.campaign.gold);
         if (pick >= 0) {
           const before = gameState.campaign.gold;
@@ -419,50 +666,68 @@ function simulateGame(agent, element) {
 /**
  * Simulate one map navigation step
  */
+// Track what we've done to prevent infinite loops
+let _mapVisitCount = {};
+let _mapStateKey = '';
+
 function simulateMapTurn(agent, stats) {
   const campaign = gameState.campaign;
   const currentId = campaign.currentLocation;
   const currentLoc = LOCATIONS[currentId];
 
-  // If current location has things to do, do them
-  if (currentLoc.type === LOCATION_TYPES.BATTLE || currentLoc.type === LOCATION_TYPES.BOSS) {
-    if (!campaign.locationStates[currentId].cleared) {
+  // Track visits; reset when game state changes (new items/clears open new routes)
+  const stateKey = campaign.inventory.length + '-' + Object.values(campaign.locationStates).filter(s => s.cleared).length;
+  if (_mapStateKey !== stateKey) {
+    _mapVisitCount = {};
+    _mapStateKey = stateKey;
+  }
+  _mapVisitCount[currentId] = (_mapVisitCount[currentId] || 0) + 1;
+  const visitCount = _mapVisitCount[currentId];
+
+  // If we've been here too many times, just navigate away
+  if (visitCount > 3) {
+    // Force navigation, skip all features
+  } else {
+    // If current location has things to do, do them
+    if ((currentLoc.type === LOCATION_TYPES.BATTLE || currentLoc.type === LOCATION_TYPES.BOSS) &&
+        !campaign.locationStates[currentId].cleared) {
       startLocationBattle(currentId);
       stats.battlesFought++;
       return;
     }
-  }
 
-  if (currentLoc.features && currentLoc.features.includes('npc')) {
-    const quests = getAvailableQuestsAtLocation(currentId);
-    const actionable = quests.filter(q => q.action === 'offer' || q.action === 'turnin');
-    if (actionable.length > 0) {
-      openNpc(currentId);
+    if (currentLoc.features && currentLoc.features.includes('npc') && visitCount <= 1) {
+      const quests = getAvailableQuestsAtLocation(currentId);
+      const actionable = quests.filter(q => q.action === 'offer' || q.action === 'turnin');
+      if (actionable.length > 0) {
+        openNpc(currentId);
+        return;
+      }
+    }
+
+    if (currentLoc.features && currentLoc.features.includes('rest') && visitCount <= 1 &&
+        agent.shouldRest(gameState.player)) {
+      openRest();
       return;
     }
-  }
 
-  if (currentLoc.features && currentLoc.features.includes('rest') && agent.shouldRest(gameState.player)) {
-    openRest();
-    return;
-  }
+    if (currentLoc.features && currentLoc.features.includes('shop') && visitCount <= 1) {
+      const items = getAvailableShopCards();
+      if (agent.pickShopCard(items.map((i, idx) => ({ ...i, idx })), campaign.gold) >= 0) {
+        openShop();
+        return;
+      }
+    }
 
-  if (currentLoc.features && currentLoc.features.includes('shop')) {
-    const items = getAvailableShopCards();
-    if (agent.pickShopCard(items.map((i, idx) => ({ ...i, idx })), campaign.gold) >= 0) {
-      openShop();
+    if (currentLoc.event && !campaign.locationStates[currentId].cleared && visitCount <= 1) {
+      openEvent(currentLoc.event);
       return;
     }
-  }
 
-  if (currentLoc.event && !campaign.locationStates[currentId].cleared) {
-    openEvent(currentLoc.event);
-    return;
-  }
-
-  if (currentLoc.type === LOCATION_TYPES.TREASURE && !campaign.locationStates[currentId].cleared) {
-    openTreasure(currentId);
-    return;
+    if (currentLoc.type === LOCATION_TYPES.TREASURE && !campaign.locationStates[currentId].cleared) {
+      openTreasure(currentId);
+      return;
+    }
   }
 
   // Navigate to next location
@@ -486,8 +751,65 @@ function simulateMapTurn(agent, stats) {
     return;
   }
 
-  if (agent.pickMapAction() === 'progress') {
-    // Prefer uncleared locations, then unvisited
+  const mapMode = agent.pickMapAction();
+
+  if (mapMode === 'smart') {
+    // Expert: prioritize by strategic value
+    const hpRatio = gameState.player.hp / gameState.player.maxHp;
+
+    // If low HP, go to rest locations first
+    if (hpRatio < 0.5) {
+      const restLocs = connections.filter(id => {
+        const l = LOCATIONS[id];
+        return l && l.features && l.features.includes('rest');
+      });
+      if (restLocs.length > 0) { travelTo(restLocs[0]); return; }
+    }
+
+    // Prioritize: quest turn-ins > uncleared non-boss battles > NPCs > boss
+    const scored = connections.map(id => {
+      const l = LOCATIONS[id];
+      const s = campaign.locationStates[id];
+      let score = 0;
+
+      // Quest NPCs with turn-ins are high priority
+      if (l.features && l.features.includes('npc')) {
+        const quests = getAvailableQuestsAtLocation(id);
+        if (quests.some(q => q.action === 'turnin')) score += 100;
+        if (quests.some(q => q.action === 'offer')) score += 20;
+      }
+
+      // Uncleared battles
+      if (!s.cleared && (l.type === LOCATION_TYPES.BATTLE)) score += 50;
+
+      // Treasure
+      if (!s.cleared && l.type === LOCATION_TYPES.TREASURE) score += 60;
+
+      // Events
+      if (!s.cleared && l.event) score += 15;
+
+      // Hub with shop (if we have gold)
+      if (l.features && l.features.includes('shop') && campaign.gold >= 10) score += 10;
+
+      // Boss only when ready (high HP, have items)
+      if (l.type === LOCATION_TYPES.BOSS && !s.cleared) {
+        if (hpRatio > 0.7) score += 40;
+        else score += 5; // avoid boss when weak
+      }
+
+      // Unvisited locations get a small bonus
+      if (!s.visited) score += 8;
+
+      // Cleared locations: only worth visiting as a waypoint
+      if (s.cleared && s.visited) score -= 50;
+
+      return { id, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    travelTo(scored[0].id);
+  } else if (mapMode === 'progress') {
+    // Simple forward progress
     const uncleared = connections.filter(id => !campaign.locationStates[id].cleared);
     const unvisited = connections.filter(id => !campaign.locationStates[id].visited);
     const target = unvisited.length > 0 ? unvisited[0]
@@ -565,7 +887,10 @@ function simulateBattleTurn(agent, stats) {
 
 function runSimulations() {
   const elements = FORCE_ELEMENT ? [FORCE_ELEMENT] : ['fire', 'water', 'earth', 'air'];
-  const agentNames = AGENT_FILTER === 'all' ? Object.keys(AGENTS) : [AGENT_FILTER];
+  const defaultAgents = ['random', 'greedy', 'optimal'];
+  const agentNames = AGENT_FILTER === 'all' ? Object.keys(AGENTS)
+    : AGENT_FILTER === 'default' ? defaultAgents
+    : [AGENT_FILTER];
 
   console.log(`\n🐉 Dragon Cards Simulator`);
   console.log(`   Runs: ${NUM_RUNS} per agent × ${elements.length} elements`);
@@ -653,6 +978,8 @@ function runSimulations() {
       assessment = winRate < 10 ? '❌ Too hard' : winRate < 50 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else if (agentName === 'optimal') {
       assessment = winRate < 30 ? '❌ Too hard' : winRate < 80 ? '✅ Good balance' : '⚠️ Slightly easy';
+    } else if (agentName === 'expert') {
+      assessment = winRate < 40 ? '❌ Too hard' : winRate < 85 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else {
       assessment = `${winRate.toFixed(1)}% win rate`;
     }
