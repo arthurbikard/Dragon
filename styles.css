@@ -564,11 +564,11 @@ html, body {
   border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* --- Combat log: single-line divider --- */
+/* --- Combat log: fills the battlefield gap --- */
 .combat-log {
   width: 100%;
   text-align: center;
-  flex-shrink: 0;
+  flex: 1;
   min-height: 16px;
   display: flex;
   align-items: center;
@@ -664,13 +664,13 @@ html, body {
    ============================== */
 .hand {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 5px;
   padding: 4px 6px 2px;
   width: 100%;
-  flex: 1;
-  align-content: end;
+  flex-shrink: 0;
   overflow: hidden;
+  margin-top: auto;
 }
 
 .empty-hand {
