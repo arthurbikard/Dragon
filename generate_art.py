@@ -222,6 +222,88 @@ IMAGES = {
         f"A fallen warrior's sword stuck in the ground before a massive dragon silhouette, "
         f"dark moody atmosphere, embers floating, somber defeat scene, {STYLE}"
     ),
+
+    # --- Map background ---
+    "map_bg.png": (
+        f"A top-down fantasy parchment map of volcanic islands, "
+        f"hand-drawn cartography style with aged paper texture, "
+        f"mountains, forests, rivers, coastlines, ocean waves, "
+        f"warm sepia and brown tones, compass rose in corner, "
+        f"old world exploration map, highly detailed, {STYLE}"
+    ),
+
+    # --- New enemy portraits ---
+    "enemy_forest_wyrm.png": (
+        f"A forest wyrm dragon covered in moss and vines, green and brown scales, "
+        f"glowing yellow-green eyes, coiled around a twisted ancient tree, "
+        f"dark misty forest background, menacing, portrait view, {STYLE}"
+    ),
+    "enemy_ember_titan.png": (
+        f"A massive ember titan dragon made of cooling lava and obsidian rock, "
+        f"cracks of glowing magma across its body, towering and powerful, "
+        f"volcanic eruption background, portrait view, {STYLE}"
+    ),
+
+    # --- NPC portraits ---
+    "npc_elder.png": (
+        f"A wise old village elder with a long white beard, wearing humble brown robes, "
+        f"kind weathered face, holding a wooden staff, warm firelight, "
+        f"dark background, portrait view, {STYLE}"
+    ),
+    "npc_merchant.png": (
+        f"A rugged fantasy merchant with a thick dark beard, leather apron, "
+        f"various potions and trinkets hanging from his belt, shrewd eyes, "
+        f"market stall lantern light, dark background, portrait view, {STYLE}"
+    ),
+    "npc_priestess.png": (
+        f"A mystical temple priestess in flowing white and gold robes, "
+        f"glowing arcane markings on her hands, serene expression, "
+        f"sacred blue flame behind her, dark background, portrait view, {STYLE}"
+    ),
+    "npc_wanderer.png": (
+        f"A mysterious hooded wanderer sitting by a campfire, "
+        f"scarred face partially visible, shuffling strange glowing cards, "
+        f"smoke and embers rising, dark forest background, portrait view, {STYLE}"
+    ),
+
+    # --- Location icons (small vignettes) ---
+    "loc_misty_shore.png": (
+        f"A foggy rocky coastline with crashing waves, a dragon silhouette in the mist, "
+        f"atmospheric moody coastal scene, dark and mysterious, {STYLE}"
+    ),
+    "loc_village.png": (
+        f"A small fantasy village with thatched roof cottages, warm lantern light, "
+        f"cobblestone path, cozy and inviting, evening scene, {STYLE}"
+    ),
+    "loc_dark_forest.png": (
+        f"A dark twisted forest with gnarled trees, eerie green bioluminescent mushrooms, "
+        f"thick fog between the trees, ominous and foreboding, {STYLE}"
+    ),
+    "loc_ancient_temple.png": (
+        f"Ancient stone temple ruins with crumbling pillars, mystical blue flame on an altar, "
+        f"overgrown with vines, moonlight streaming through, {STYLE}"
+    ),
+    "loc_lava_bridge.png": (
+        f"An ancient crumbling bridge stretching across a chasm filled with glowing lava, "
+        f"volcanic rocks and magma below, dark smoky atmosphere, "
+        f"wide cinematic view, {STYLE}"
+    ),
+    "loc_crystal_cave.png": (
+        f"A cave interior filled with massive prismatic crystals, "
+        f"rainbow light refracting through gems, a healing spring at center, {STYLE}"
+    ),
+    "loc_volcano_peak.png": (
+        f"A volcanic mountain peak with lava flows and ash clouds, "
+        f"dragon silhouette against the eruption, dramatic and dangerous, {STYLE}"
+    ),
+    "loc_dragons_lair.png": (
+        f"A massive dark cavern entrance carved like a dragon skull, "
+        f"glowing red eyes in the carved stone, treasure gold visible inside, {STYLE}"
+    ),
+    "loc_wanderers_camp.png": (
+        f"A lonely campfire in a forest clearing at night, "
+        f"a tent and bedroll beside it, stars visible through tree canopy, {STYLE}"
+    ),
 }
 
 

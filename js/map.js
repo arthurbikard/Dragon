@@ -25,7 +25,8 @@ const LOCATIONS = {
     connections: ['start', 'village'],
     enemy: 'young_drake',
     rewards: { gold: 8, cardReward: true },
-    mapPos: { x: 50, y: 88 }, // percent position on map
+    image: 'images/loc_misty_shore.png',
+    mapPos: { x: 50, y: 88 },
   },
   village: {
     name: 'Village',
@@ -34,6 +35,7 @@ const LOCATIONS = {
     connections: ['misty_shore', 'dark_forest', 'ancient_temple', 'wanderers_camp'],
     features: ['shop', 'rest', 'npc'],
     npcs: ['elder', 'merchant'],
+    image: 'images/loc_village.png',
     mapPos: { x: 35, y: 70 },
   },
   dark_forest: {
@@ -43,6 +45,7 @@ const LOCATIONS = {
     connections: ['village', 'lava_bridge'],
     enemy: 'forest_wyrm',
     rewards: { gold: 12, item: 'fire_rune', cardReward: true },
+    image: 'images/loc_dark_forest.png',
     mapPos: { x: 25, y: 50 },
   },
   ancient_temple: {
@@ -53,6 +56,7 @@ const LOCATIONS = {
     features: ['npc', 'event'],
     npcs: ['priestess'],
     event: 'temple_altar',
+    image: 'images/loc_ancient_temple.png',
     mapPos: { x: 70, y: 50 },
   },
   wanderers_camp: {
@@ -62,6 +66,7 @@ const LOCATIONS = {
     connections: ['village'],
     features: ['rest', 'event'],
     event: 'wanderers_gamble',
+    image: 'images/loc_wanderers_camp.png',
     mapPos: { x: 65, y: 75 },
   },
   lava_bridge: {
@@ -70,6 +75,7 @@ const LOCATIONS = {
     description: 'A narrow stone bridge spans a river of molten lava. Ancient fire runes glow on the archway.',
     connections: ['dark_forest', 'volcano_peak'],
     requires: 'fire_rune',
+    image: 'images/loc_lava_bridge.png',
     mapPos: { x: 20, y: 33 },
   },
   crystal_cave: {
@@ -79,6 +85,7 @@ const LOCATIONS = {
     connections: ['ancient_temple'],
     requires: 'crystal_key',
     rewards: { rareCard: true, healFull: true },
+    image: 'images/loc_crystal_cave.png',
     mapPos: { x: 75, y: 30 },
   },
   volcano_peak: {
@@ -88,6 +95,7 @@ const LOCATIONS = {
     connections: ['lava_bridge', 'dragons_lair'],
     enemy: 'ember_titan',
     rewards: { gold: 20, item: 'dragon_crown', cardReward: true },
+    image: 'images/loc_volcano_peak.png',
     mapPos: { x: 40, y: 18 },
   },
   dragons_lair: {
@@ -97,6 +105,7 @@ const LOCATIONS = {
     connections: ['volcano_peak'],
     requires: 'dragon_crown',
     enemy: 'ancient_dragon',
+    image: 'images/loc_dragons_lair.png',
     mapPos: { x: 50, y: 5 },
   },
 };

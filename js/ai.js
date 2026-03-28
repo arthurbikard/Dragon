@@ -36,7 +36,7 @@ const AI_ENEMIES = [
     element: ELEMENTS.EARTH,
     hp: 45,
     maxHp: 45,
-    image: 'images/enemy_storm_wyrm.png', // reuse for now
+    image: 'images/enemy_forest_wyrm.png',
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
       { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
@@ -50,7 +50,7 @@ const AI_ENEMIES = [
     element: ELEMENTS.FIRE,
     hp: 60,
     maxHp: 60,
-    image: 'images/enemy_young_drake.png', // reuse for now
+    image: 'images/enemy_ember_titan.png',
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 10, weight: 2 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },

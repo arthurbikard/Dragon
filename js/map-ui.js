@@ -39,23 +39,15 @@ function renderMapNodes() {
     else if (state.unlocked && !isLocked) statusClass = 'node-available';
     else if (state.unlocked && isLocked) statusClass = 'node-locked';
 
-    const typeIcons = {
-      [LOCATION_TYPES.BATTLE]: '⚔️',
-      [LOCATION_TYPES.HUB]: '🏘️',
-      [LOCATION_TYPES.GATE]: '🚪',
-      [LOCATION_TYPES.TEMPLE]: '🏛️',
-      [LOCATION_TYPES.TREASURE]: '💎',
-      [LOCATION_TYPES.CAMP]: '🏕️',
-      [LOCATION_TYPES.BOSS]: '🐉',
-    };
-
-    const icon = typeIcons[loc.type] || '❓';
+    const nodeStyle = loc.image
+      ? `background-image: url('${loc.image}')`
+      : '';
 
     return `
       <div class="map-node ${statusClass} ${isCurrent ? 'node-current' : ''} ${canAccess ? 'node-tappable' : ''}"
            style="left: ${loc.mapPos.x}%; top: ${loc.mapPos.y}%"
-           onclick="${canAccess ? `onMapNodeTap('${id}')` : ''}">
-        <span class="node-icon">${icon}</span>
+           onclick="${canAccess || isCurrent ? `onMapNodeTap('${id}')` : ''}">
+        <span class="node-icon" style="${nodeStyle}"></span>
         <span class="node-label">${loc.name}</span>
         ${isLocked ? '<span class="node-lock">🔒</span>' : ''}
       </div>
@@ -297,7 +289,7 @@ function renderNpc() {
 
   return `
     <div class="screen npc-screen">
-      <div class="npc-portrait">${npc.icon}</div>
+      <div class="npc-portrait" style="${npc.image ? `background-image: url('${npc.image}')` : ''}">${npc.image ? '' : npc.icon}</div>
       <div class="npc-name">${npc.name}</div>
       <div class="npc-quest-name">${quest.name}</div>
       <div class="npc-text">${text}</div>

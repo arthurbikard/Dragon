@@ -11,18 +11,21 @@ const NPCS = {
   elder: {
     name: 'Village Elder',
     icon: '👴',
+    image: 'images/npc_elder.png',
     location: 'village',
     greeting: 'Welcome, dragon hunter. Dark times have come to the Isles.',
   },
   merchant: {
     name: 'Merchant',
     icon: '🧔',
+    image: 'images/npc_merchant.png',
     location: 'village',
     greeting: 'Looking to trade? I deal in cards and curiosities.',
   },
   priestess: {
     name: 'Temple Priestess',
     icon: '🧙‍♀️',
+    image: 'images/npc_priestess.png',
     location: 'ancient_temple',
     greeting: 'The temple has long awaited a champion.',
   },
