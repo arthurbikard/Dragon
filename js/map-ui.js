@@ -2,8 +2,8 @@
 
 // === WORLD MAP SCREEN ===
 
-// Debug mode: set to true to enable draggable nodes
-const MAP_DEBUG = true;
+// Dev mode: toggled from the menu screen
+let MAP_DEBUG = false;
 
 function renderMap() {
   const campaign = gameState.campaign;

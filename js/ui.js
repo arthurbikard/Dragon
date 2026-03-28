@@ -66,10 +66,18 @@ function renderMenu() {
         <div class="version-bar">
           <span class="version-text">v${GAME_VERSION}</span>
           <button class="version-reload" onclick="hardReload()">↻ Update</button>
+          <button class="version-reload" onclick="toggleDevMode()" id="devModeBtn">
+            ${MAP_DEBUG ? '🔧 Dev: ON' : '🔧 Dev'}
+          </button>
         </div>
       </div>
     </div>
   `;
+}
+
+function toggleDevMode() {
+  MAP_DEBUG = !MAP_DEBUG;
+  renderGame();
 }
 
 function hardReload() {
