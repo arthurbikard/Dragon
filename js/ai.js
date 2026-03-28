@@ -15,7 +15,7 @@ const INTENT_ICONS = {
 };
 
 const AI_ENEMIES = [
-  // Misty Shore: Young Drake (easy but not trivial)
+  // === EASY TIER ===
   {
     id: 'young_drake',
     name: 'Young Drake',
@@ -26,52 +26,98 @@ const AI_ENEMIES = [
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
       { type: INTENT_TYPES.DEFEND, block: 5, weight: 2 },
-      { type: INTENT_TYPES.ATTACK, damage: 6, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 1 },
     ],
   },
-  // Dark Forest: Forest Wyrm (medium-hard)
   {
-    id: 'forest_wyrm',
-    name: 'Forest Wyrm',
+    id: 'flame_serpent',
+    name: 'Flame Serpent',
+    element: ELEMENTS.FIRE,
+    hp: 32,
+    maxHp: 32,
+    image: 'images/enemy_young_drake.png',
+    // Burns you every turn — rewards fast kills and cleanse
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 5, effects: [{ type: 'burn', value: 2, duration: 3 }], weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 3, duration: 2 }], weight: 1 },
+    ],
+  },
+
+  // === MEDIUM TIER ===
+  {
+    id: 'thornback',
+    name: 'Thornback',
     element: ELEMENTS.EARTH,
     hp: 48,
     maxHp: 48,
     image: 'images/enemy_forest_wyrm.png',
+    // High thorns — punishes multi-hit, rewards big single strikes
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 2 },
+      { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 4, duration: 2 }], weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 14, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
-  // Volcano Peak: Ember Titan (hard, burns you down)
   {
-    id: 'ember_titan',
-    name: 'Ember Titan',
-    element: ELEMENTS.FIRE,
-    hp: 56,
-    maxHp: 56,
-    image: 'images/enemy_ember_titan.png',
+    id: 'storm_caller',
+    name: 'Storm Caller',
+    element: ELEMENTS.AIR,
+    hp: 42,
+    maxHp: 42,
+    image: 'images/enemy_storm_wyrm.png',
+    // Buffs itself each turn — snowballs if you don't kill fast
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 16, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 6, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 1 },
     ],
   },
-  // Dragon's Lair: Ancient Dragon (tough final boss)
+
+  // === ELITE TIER ===
+  {
+    id: 'iron_golem',
+    name: 'Iron Golem',
+    element: ELEMENTS.EARTH,
+    hp: 65,
+    maxHp: 65,
+    image: 'images/enemy_ember_titan.png',
+    // Alternates between huge block and big attacks. Burn bypasses block.
+    intents: [
+      { type: INTENT_TYPES.DEFEND, block: 18, weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 14, weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
+    ],
+  },
+  {
+    id: 'shadow_wyrm',
+    name: 'Shadow Wyrm',
+    element: ELEMENTS.AIR,
+    hp: 55,
+    maxHp: 55,
+    image: 'images/enemy_storm_wyrm.png',
+    // Applies weak — your attacks do less. Rewards block-heavy play + cleanse.
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
+    ],
+  },
+
+  // === BOSS ===
   {
     id: 'ancient_dragon',
     name: 'Ancient Dragon',
     element: ELEMENTS.EARTH,
-    hp: 100,
-    maxHp: 100,
+    hp: 120,
+    maxHp: 120,
     image: 'images/enemy_ancient_dragon.png',
+    // Multi-phase: mixes everything. Requires a well-built deck.
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 12, weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 3 }], weight: 1 },
     ],
   },
 ];
@@ -92,9 +138,9 @@ function createAIEnemy(indexOrId) {
     image: template.image,
     block: 0,
     statuses: [],
+    strength: 0, // +damage per attack
     intents: template.intents,
     nextIntent: null,
-    // AI enemies don't use cards/deck
     hand: [],
     deck: [],
     discard: [],
@@ -123,8 +169,6 @@ function executeAITurn() {
     return;
   }
 
-  // statuses and block reset already handled by startTurn()
-
   if (enemy.hp <= 0) {
     handleDeath();
     return;
@@ -134,9 +178,12 @@ function executeAITurn() {
 
   // Execute intent
   if (intent.damage) {
-    let dmg = intent.damage;
+    let dmg = intent.damage + (enemy.strength || 0);
     const vuln = player.statuses.find(s => s.type === 'vulnerable');
     if (vuln) dmg = Math.floor(dmg * 1.5);
+    // Weak reduces incoming damage from enemy? No — weak applies to the weakened entity's OWN attacks
+    const weak = enemy.statuses.find(s => s.type === 'weak');
+    if (weak) dmg = Math.floor(dmg * 0.75);
 
     applyDamage(player, dmg);
     addLog(`${enemy.name} deals ${dmg} damage.`);
@@ -149,7 +196,10 @@ function executeAITurn() {
 
   if (intent.effects) {
     for (const effect of intent.effects) {
-      if (['burn', 'vulnerable'].includes(effect.type)) {
+      if (effect.type === 'strength') {
+        enemy.strength = (enemy.strength || 0) + effect.value;
+        addLog(`${enemy.name} gains ${effect.value} Strength!`);
+      } else if (['burn', 'vulnerable', 'weak'].includes(effect.type)) {
         applyEffect(effect, enemy, player);
       } else if (['thorns'].includes(effect.type)) {
         applyEffect(effect, enemy, enemy);

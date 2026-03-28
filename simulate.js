@@ -88,10 +88,8 @@ const ABLATIONS = {
       orig(effect, caster, target);
     };
   }},
-  no_crystal:    { name: 'No Crystal Cave', apply() {
-    LOCATIONS.crystal_cave.requires = '__impossible__';
-  }},
-  direct_path:   { name: 'Direct path only (no side content)', apply() { /* handled in map */ } },
+  no_elites:     { name: 'No elites (skip elite nodes)', apply() { /* handled in node picker */ } },
+  direct_path:   { name: 'Battles only (skip non-combat nodes)', apply() { /* handled in node picker */ } },
   double_enemy:  { name: 'Double enemy HP', apply() { /* handled before battle */ } },
 };
 
@@ -483,17 +481,11 @@ const AGENTS = {
       // Rest if below 50%, or below 70% if about to face a tough battle
       const hpRatio = player.hp / player.maxHp;
       if (hpRatio < 0.5) return true;
-      // Check if next reachable battle is hard
+      // Check if near end of campaign (boss coming)
       if (gameState.campaign) {
-        const currentId = gameState.campaign.currentLocation;
-        const loc = LOCATIONS[currentId];
-        const nextBattles = loc.connections.filter(id => {
-          const l = LOCATIONS[id];
-          return l && (l.type === LOCATION_TYPES.BATTLE || l.type === LOCATION_TYPES.BOSS) &&
-            !gameState.campaign.locationStates[id].cleared;
-        });
-        if (nextBattles.some(id => LOCATIONS[id].type === LOCATION_TYPES.BOSS) && hpRatio < 0.8) return true;
-        if (nextBattles.length > 0 && hpRatio < 0.65) return true;
+        const actsLeft = MAP_CONFIG.acts - gameState.campaign.currentAct;
+        if (actsLeft <= 1 && hpRatio < 0.8) return true;
+        if (actsLeft <= 2 && hpRatio < 0.65) return true;
       }
       return false;
     },
@@ -579,7 +571,12 @@ function simulateGame(agent, element, ablation) {
       }
 
       if (gameState.phase === GAME_PHASES.MAP) {
-        simulateMapTurn(agent, stats);
+        try {
+          simulateMapTurn(agent, stats);
+        } catch(e) {
+          stats.error = `Map error: ${e.message} (act ${gameState.campaign.currentAct})`;
+          break;
+        }
         continue;
       }
 
@@ -614,73 +611,88 @@ function simulateGame(agent, element, ablation) {
       }
 
       if (gameState.phase === GAME_PHASES.SHOP) {
-        if (abl === 'No gold (shop disabled)') { returnToMap(); continue; }
+        if (abl === 'No gold (shop disabled)') { advanceAfterNode(); continue; }
         const items = gameState._shopCards || [];
-        // Expert: consider card removal first
-        if (agent.shouldRemoveCard && agent.shouldRemoveCard(gameState.player.deck, gameState.campaign.gold)) {
-          openCardRemove();
-          continue;
-        }
         const pick = agent.pickShopCard(items, gameState.campaign.gold);
         if (pick >= 0) {
           const before = gameState.campaign.gold;
           buyCard(pick);
           stats.goldSpent += before - gameState.campaign.gold;
+          // Stay in shop to potentially buy more
         } else {
-          returnToMap();
+          advanceAfterNode();
         }
         continue;
       }
 
       if (gameState.phase === GAME_PHASES.REST) {
-        if (abl === 'No resting') { returnToMap(); continue; }
-        if (agent.shouldRest(gameState.player)) {
-          doRest();
+        if (abl === 'No resting') { advanceAfterNode(); continue; }
+        const hpRatio = gameState.player.hp / gameState.player.maxHp;
+        const hasUpgradeable = gameState.player.deck.some(c => !c.upgraded);
+        const deckSize = gameState.player.deck.length + gameState.player.discard.length;
+
+        if (hpRatio < 0.5) {
+          doRest(); // heal when low
+        } else if (hasUpgradeable && hpRatio > 0.7) {
+          // Upgrade best card when healthy
+          gameState._upgradeMode = 'upgrade';
+          gameState.phase = GAME_PHASES.CARD_UPGRADE;
+        } else if (deckSize > 12 && hpRatio > 0.6) {
+          // Remove weakest card if deck is bloated
+          gameState._upgradeMode = 'remove';
+          gameState.phase = GAME_PHASES.CARD_UPGRADE;
         } else {
-          returnToMap();
+          doRest();
         }
         continue;
       }
 
       if (gameState.phase === GAME_PHASES.NPC) {
-        if (abl === 'No NPCs/quests') { returnToMap(); continue; }
-        const quests = gameState._npcQuests || [];
-        const qi = gameState._npcQuestIndex || 0;
-        if (qi >= quests.length) {
-          returnToMap();
-          continue;
-        }
-        const current = quests[qi];
-        if (current.action === 'offer') {
-          doAcceptQuest(current.questId);
-        } else if (current.action === 'turnin') {
-          doTurnInQuest(current.questId);
-          stats.questsCompleted++;
-        } else {
-          nextNpc();
-        }
+        advanceAfterNode();
         continue;
       }
 
       if (gameState.phase === GAME_PHASES.EVENT) {
-        if (abl === 'No events') { returnToMap(); continue; }
+        if (abl === 'No events') { advanceAfterNode(); continue; }
         const eventId = gameState._currentEvent;
         const event = EVENTS[eventId];
         if (event) {
           const choice = agent.pickEventChoice(event.choices);
           doEventChoice(choice);
         } else {
-          returnToMap();
+          advanceAfterNode();
         }
         continue;
       }
 
       if (gameState.phase === GAME_PHASES.CARD_UPGRADE) {
-        // Just pick first card or cancel
-        if (gameState.player.deck.length > 0) {
-          doCardAction(0);
+        const mode = gameState._upgradeMode || 'upgrade';
+        const allCards = [...gameState.player.deck, ...gameState.player.discard];
+        const cards = mode === 'upgrade' ? allCards.filter(c => !c.upgraded) : allCards;
+
+        if (cards.length === 0) {
+          advanceAfterNode();
+          continue;
+        }
+
+        if (mode === 'remove') {
+          // Remove the weakest card (lowest damage + block)
+          let weakIdx = 0;
+          let weakScore = Infinity;
+          cards.forEach((c, i) => {
+            const s = c.damage + c.block + c.effects.length * 3;
+            if (s < weakScore) { weakScore = s; weakIdx = i; }
+          });
+          doCardAction(weakIdx);
         } else {
-          returnToMap();
+          // Upgrade the strongest card
+          let bestIdx = 0;
+          let bestScore = -1;
+          cards.forEach((c, i) => {
+            const s = c.damage * 2 + c.block * 1.5 + c.effects.length * 3;
+            if (s > bestScore) { bestScore = s; bestIdx = i; }
+          });
+          doCardAction(bestIdx);
         }
         continue;
       }
@@ -703,9 +715,7 @@ function simulateGame(agent, element, ablation) {
 
     stats.goldEarned = gameState.campaign ? gameState.campaign.gold + stats.goldSpent : 0;
     stats.itemsCollected = gameState.campaign ? gameState.campaign.inventory.length : 0;
-    stats.locationsVisited = gameState.campaign
-      ? Object.values(gameState.campaign.locationStates).filter(s => s.visited).length
-      : 0;
+    stats.locationsVisited = gameState.campaign ? gameState.campaign.currentAct : 0;
 
   } catch (e) {
     stats.error = `${e.message} (at action ${stats.totalActions})`;
@@ -717,165 +727,73 @@ function simulateGame(agent, element, ablation) {
 /**
  * Simulate one map navigation step
  */
-// Track what we've done to prevent infinite loops
-let _mapVisitCount = {};
-let _mapStateKey = '';
 let _activeAblation = null;
 
-function simulateMapTurn(agent, stats) {
+function pickMapNode(agent, available) {
+  if (available.length === 1) return available[0];
+
+  const hpRatio = gameState.player.hp / gameState.player.maxHp;
   const abl = _activeAblation;
-  const campaign = gameState.campaign;
-  const currentId = campaign.currentLocation;
-  const currentLoc = LOCATIONS[currentId];
 
-  // Track visits; reset when game state changes (new items/clears open new routes)
-  const stateKey = campaign.inventory.length + '-' + Object.values(campaign.locationStates).filter(s => s.cleared).length;
-  if (_mapStateKey !== stateKey) {
-    _mapVisitCount = {};
-    _mapStateKey = stateKey;
-  }
-  _mapVisitCount[currentId] = (_mapVisitCount[currentId] || 0) + 1;
-  const visitCount = _mapVisitCount[currentId];
-
-  // If we've been here too many times, just navigate away
-  if (visitCount > 3) {
-    // Force navigation, skip all features
-  } else {
-    // If current location has things to do, do them
-    if ((currentLoc.type === LOCATION_TYPES.BATTLE || currentLoc.type === LOCATION_TYPES.BOSS) &&
-        !campaign.locationStates[currentId].cleared) {
-      startLocationBattle(currentId);
-      stats.battlesFought++;
-      return;
-    }
-
-    if (abl !== 'No NPCs/quests' && abl !== 'Direct path only (no side content)' &&
-        currentLoc.features && currentLoc.features.includes('npc') && visitCount <= 1) {
-      const quests = getAvailableQuestsAtLocation(currentId);
-      const actionable = quests.filter(q => q.action === 'offer' || q.action === 'turnin');
-      if (actionable.length > 0) {
-        openNpc(currentId);
-        return;
-      }
-    }
-
-    if (abl !== 'No resting' && abl !== 'Direct path only (no side content)' &&
-        currentLoc.features && currentLoc.features.includes('rest') && visitCount <= 1 &&
-        agent.shouldRest(gameState.player)) {
-      openRest();
-      return;
-    }
-
-    if (abl !== 'No gold (shop disabled)' && abl !== 'Direct path only (no side content)' &&
-        currentLoc.features && currentLoc.features.includes('shop') && visitCount <= 1) {
-      const items = getAvailableShopCards();
-      if (agent.pickShopCard(items.map((i, idx) => ({ ...i, idx })), campaign.gold) >= 0) {
-        openShop();
-        return;
-      }
-    }
-
-    if (abl !== 'No events' && abl !== 'Direct path only (no side content)' &&
-        currentLoc.event && !campaign.locationStates[currentId].cleared && visitCount <= 1) {
-      openEvent(currentLoc.event);
-      return;
-    }
-
-    if (currentLoc.type === LOCATION_TYPES.TREASURE && !campaign.locationStates[currentId].cleared) {
-      openTreasure(currentId);
-      return;
-    }
+  if (agent.name === 'Random') {
+    return available[Math.floor(Math.random() * available.length)];
   }
 
-  // Navigate to next location
-  const connections = currentLoc.connections.filter(id => {
-    const loc = LOCATIONS[id];
-    if (!loc || loc.hidden) return false;
-    return canAccessLocation(id);
+  // Score each node
+  const scored = available.map(node => {
+    let score = 0;
+
+    if (node.type === NODE_TYPES.BATTLE) score = 5;
+    if (node.type === NODE_TYPES.ELITE) score = hpRatio > 0.6 ? 8 : 1;
+    if (node.type === NODE_TYPES.REST) score = hpRatio < 0.7 ? 10 : 2;
+    if (node.type === NODE_TYPES.SHOP) score = gameState.campaign.gold >= 10 ? 6 : 2;
+    if (node.type === NODE_TYPES.EVENT) score = 5;
+    if (node.type === NODE_TYPES.BOSS) score = 5;
+
+    // Ablation: avoid disabled node types
+    if (abl === 'No resting' && node.type === NODE_TYPES.REST) score = 0;
+    if (abl === 'No events' && node.type === NODE_TYPES.EVENT) score = 0;
+    if (abl === 'No gold (shop disabled)' && node.type === NODE_TYPES.SHOP) score = 0;
+
+    // Optimal/expert: prefer rest when low, elites when strong
+    if (agent.name === 'Optimal' || agent.name === 'Expert') {
+      if (node.type === NODE_TYPES.REST && hpRatio < 0.5) score = 15;
+      if (node.type === NODE_TYPES.ELITE && hpRatio > 0.7) score = 12;
+    }
+
+    return { node, score };
   });
 
-  if (connections.length === 0) {
-    // Stuck — try to go back
-    const allConnected = currentLoc.connections.filter(id => {
-      const s = campaign.locationStates[id];
-      return s && s.unlocked;
-    });
-    if (allConnected.length > 0) {
-      travelTo(allConnected[Math.floor(Math.random() * allConnected.length)]);
-    } else {
-      stats.error = `Stuck at ${currentId} with no accessible connections`;
-    }
-    return;
-  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].node;
+}
 
-  const mapMode = agent.pickMapAction();
+/**
+ * In the branching map, the player picks one of the available nodes.
+ * The simulation chooses a node based on agent strategy, then the
+ * node's type determines the game phase (battle, rest, shop, event).
+ */
+function simulateMapTurn(agent, stats) {
+  try {
+    const available = getAvailableNodes();
 
-  if (mapMode === 'smart') {
-    // Expert: prioritize by strategic value
-    const hpRatio = gameState.player.hp / gameState.player.maxHp;
-
-    // If low HP, go to rest locations first
-    if (hpRatio < 0.5) {
-      const restLocs = connections.filter(id => {
-        const l = LOCATIONS[id];
-        return l && l.features && l.features.includes('rest');
-      });
-      if (restLocs.length > 0) { travelTo(restLocs[0]); return; }
+    if (!available || available.length === 0) {
+      stats.error = 'No available nodes on map (act ' + gameState.campaign.currentAct + ')';
+      return;
     }
 
-    // Prioritize: quest turn-ins > uncleared non-boss battles > NPCs > boss
-    const scored = connections.map(id => {
-      const l = LOCATIONS[id];
-      const s = campaign.locationStates[id];
-      let score = 0;
+    // Agent picks which node to visit
+    const node = pickMapNode(agent, available);
+    if (!node) {
+      stats.error = 'pickMapNode returned null';
+      return;
+    }
+    const act = node.act !== undefined ? node.act : MAP_CONFIG.acts;
+    const idx = node.index !== undefined ? node.index : 0;
 
-      // Quest NPCs with turn-ins are high priority
-      if (l.features && l.features.includes('npc')) {
-        const quests = getAvailableQuestsAtLocation(id);
-        if (quests.some(q => q.action === 'turnin')) score += 100;
-        if (quests.some(q => q.action === 'offer')) score += 20;
-      }
-
-      // Uncleared battles
-      if (!s.cleared && (l.type === LOCATION_TYPES.BATTLE)) score += 50;
-
-      // Treasure
-      if (!s.cleared && l.type === LOCATION_TYPES.TREASURE) score += 60;
-
-      // Events
-      if (!s.cleared && l.event) score += 15;
-
-      // Hub with shop (if we have gold)
-      if (l.features && l.features.includes('shop') && campaign.gold >= 10) score += 10;
-
-      // Boss only when ready (high HP, have items)
-      if (l.type === LOCATION_TYPES.BOSS && !s.cleared) {
-        if (hpRatio > 0.7) score += 40;
-        else score += 5; // avoid boss when weak
-      }
-
-      // Unvisited locations get a small bonus
-      if (!s.visited) score += 8;
-
-      // Cleared locations: only worth visiting as a waypoint
-      if (s.cleared && s.visited) score -= 50;
-
-      return { id, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    travelTo(scored[0].id);
-  } else if (mapMode === 'progress') {
-    // Simple forward progress
-    const uncleared = connections.filter(id => !campaign.locationStates[id].cleared);
-    const unvisited = connections.filter(id => !campaign.locationStates[id].visited);
-    const target = unvisited.length > 0 ? unvisited[0]
-      : uncleared.length > 0 ? uncleared[0]
-      : connections[Math.floor(Math.random() * connections.length)];
-    travelTo(target);
-  } else {
-    // Random
-    travelTo(connections[Math.floor(Math.random() * connections.length)]);
+    onNodeSelect(act, idx);
+  } catch (e) {
+    stats.error = e.message + ' (map turn, act ' + gameState.campaign.currentAct + ')';
   }
 }
 
@@ -1030,13 +948,13 @@ function runSimulations() {
     const winRate = results.filter(r => r.won).length / results.length * 100;
     let assessment;
     if (agentName === 'random') {
-      assessment = winRate < 5 ? '✅ Good (hard enough)' : winRate < 15 ? '⚠️ Slightly easy' : '❌ Too easy';
+      assessment = winRate < 3 ? '✅ Good (hard enough)' : winRate < 10 ? '⚠️ Slightly easy' : '❌ Too easy';
     } else if (agentName === 'greedy') {
-      assessment = winRate < 10 ? '❌ Too hard' : winRate < 50 ? '✅ Good balance' : '⚠️ Slightly easy';
+      assessment = winRate < 5 ? '❌ Too hard' : winRate < 30 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else if (agentName === 'optimal') {
-      assessment = winRate < 30 ? '❌ Too hard' : winRate < 80 ? '✅ Good balance' : '⚠️ Slightly easy';
+      assessment = winRate < 15 ? '❌ Too hard' : winRate < 60 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else if (agentName === 'expert') {
-      assessment = winRate < 40 ? '❌ Too hard' : winRate < 85 ? '✅ Good balance' : '⚠️ Slightly easy';
+      assessment = winRate < 30 ? '❌ Too hard' : winRate < 75 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else {
       assessment = `${winRate.toFixed(1)}% win rate`;
     }

@@ -69,13 +69,24 @@ function startAIGame(element) {
   renderGame();
 }
 
-function startLocationBattle(locId) {
-  const loc = LOCATIONS[locId];
-  if (!loc.enemy) return;
-  gameState._battleLocationId = locId;
-  setupAIBattleByEnemy(loc.enemy);
+function startNodeBattle(enemyId, goldReward) {
+  gameState._battleLocationId = enemyId;
+  gameState._battleGoldReward = goldReward || 0;
+  gameState._battleIsElite = false;
+  setupAIBattleByEnemy(enemyId);
+  prepareBattle();
+}
+
+function startEliteBattle(enemyId, goldReward) {
+  gameState._battleLocationId = enemyId;
+  gameState._battleGoldReward = goldReward || 0;
+  gameState._battleIsElite = true;
+  setupAIBattleByEnemy(enemyId);
+  prepareBattle();
+}
+
+function prepareBattle() {
   gameState.phase = GAME_PHASES.BATTLE;
-  // Reset player deck for battle
   gameState.player.deck = shuffleArray([
     ...gameState.player.deck,
     ...gameState.player.discard,
@@ -216,6 +227,10 @@ function playCard(index) {
       addLog(`Elemental advantage! ${ELEMENT_ICONS[card.element]} > ${ELEMENT_ICONS[defender.element]}`);
     }
 
+    // Weak reduces YOUR attack damage
+    const weak = attacker.statuses ? attacker.statuses.find(s => s.type === 'weak') : null;
+    if (weak) dmg = Math.floor(dmg * 0.75);
+
     // Vulnerable only checked at resolution for PVP, immediately for AI
     if (!isPVP) {
       const vuln = defender.statuses.find(s => s.type === 'vulnerable');
@@ -265,7 +280,7 @@ function playCard(index) {
 }
 
 function isOffensiveEffect(effect) {
-  return ['burn', 'vulnerable'].includes(effect.type);
+  return ['burn', 'vulnerable', 'weak'].includes(effect.type);
 }
 
 function describeEffect(effect) {
@@ -350,6 +365,16 @@ function applyEffect(effect, caster, target) {
         target.statuses.push({ type: 'vulnerable', value: effect.value, duration: effect.duration });
       }
       addLog(`Applied Vulnerable for ${effect.duration} turns.`);
+      break;
+    }
+    case 'weak': {
+      const existing = target.statuses.find(s => s.type === 'weak');
+      if (existing) {
+        existing.duration += effect.duration;
+      } else {
+        target.statuses.push({ type: 'weak', value: effect.value || 1, duration: effect.duration });
+      }
+      addLog(`Applied Weak for ${effect.duration} turns.`);
       break;
     }
     case 'cleanse': {
@@ -507,42 +532,31 @@ function handleDeath() {
   if (gameState.mode === GAME_MODES.AI) {
     if (gameState.enemy.hp <= 0) {
       // Enemy defeated
-      const locId = gameState._battleLocationId;
-      if (locId) {
-        // Campaign mode — handle location rewards
-        const loc = LOCATIONS[locId];
-        clearLocation(locId);
+      const node = getCurrentMapNode();
 
-        // Grant item reward
-        if (loc.rewards && loc.rewards.item) {
-          addItem(loc.rewards.item);
-        }
-        // Grant gold
-        if (loc.rewards && loc.rewards.gold) {
-          gameState.campaign.gold += loc.rewards.gold;
-          addLog(`Earned ${loc.rewards.gold} gold.`);
-        }
+      // Grant gold
+      const goldReward = gameState._battleGoldReward || 0;
+      if (goldReward > 0) {
+        gameState.campaign.gold += goldReward;
+        addLog(`Earned ${goldReward} gold.`);
+      }
 
-        // Check if this is the final boss
-        if (loc.type === LOCATION_TYPES.BOSS) {
-          gameState.phase = GAME_PHASES.VICTORY;
-          renderGame();
-          return;
-        }
-
-        // Offer card reward
-        if (loc.rewards && loc.rewards.cardReward) {
-          gameState.phase = GAME_PHASES.CARD_REWARD;
-          gameState._rewardCards = getRewardCards(3);
-          renderGame();
-        } else {
-          returnToMap();
-        }
-      } else {
-        // Legacy non-campaign battle (shouldn't happen)
+      // Boss defeated = victory
+      if (node && node.type === NODE_TYPES.BOSS) {
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
+        return;
       }
+
+      // Elite gives rare card + normal reward
+      if (gameState._battleIsElite) {
+        gameState._rewardCards = [getRareCard(), ...getRewardCards(2)];
+      } else {
+        gameState._rewardCards = getRewardCards(3);
+      }
+
+      gameState.phase = GAME_PHASES.CARD_REWARD;
+      renderGame();
     } else {
       // Player died
       gameState.phase = GAME_PHASES.GAME_OVER;
@@ -561,10 +575,23 @@ function pickRewardCard(index) {
   if (!card) return;
   addLog(`Added ${card.name} to deck!`);
   gameState.player.deck.push(card);
-  returnToMap();
+  advanceAfterNode();
 }
 
 function skipReward() {
+  // Skipping gives a small heal as compensation
+  const healAmount = Math.min(3, gameState.player.maxHp - gameState.player.hp);
+  if (healAmount > 0) {
+    gameState.player.hp += healAmount;
+    addLog(`Skipped reward. Healed ${healAmount} HP.`);
+  }
+  advanceAfterNode();
+}
+
+function advanceAfterNode() {
+  if (gameState.campaign) {
+    advanceToNextAct();
+  }
   returnToMap();
 }
 

@@ -318,8 +318,33 @@ function createCard(templateKey) {
     ...template,
     templateKey,
     id: _cardId++,
+    upgraded: false,
     effects: template.effects.map(e => ({ ...e })),
   };
+}
+
+// Upgrade a card in-place: +3 damage or +3 block or -1 cost (min 0)
+function upgradeCard(card) {
+  if (card.upgraded) return false;
+  card.upgraded = true;
+  card.name = card.name + '+';
+
+  if (card.damage > 0) {
+    card.damage += 3;
+    card.description = card.description.replace(/Deal \d+/, `Deal ${card.damage}`);
+  } else if (card.block > 0) {
+    card.block += 3;
+    card.description = card.description.replace(/Gain \d+ Block/, `Gain ${card.block} Block`);
+  } else if (card.cost > 0) {
+    card.cost -= 1;
+  }
+
+  // Buff effects slightly
+  for (const fx of card.effects) {
+    if (fx.value) fx.value += 1;
+  }
+
+  return true;
 }
 
 function createDeck(element) {

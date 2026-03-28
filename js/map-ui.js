@@ -1,172 +1,224 @@
 // Map screen, shop, rest, NPC, and event UI rendering
 
-// === MAP SCREEN ===
+// === MAP SCREEN — Vertical branching map ===
 function renderMap() {
   const campaign = gameState.campaign;
-  const currentLoc = LOCATIONS[campaign.currentLocation];
-  const itemIcons = campaign.inventory.map(id => ITEMS[id].icon).join(' ') || '—';
+  const map = campaign.map;
+  const available = getAvailableNodes();
+  const itemIcons = campaign.inventory.length > 0
+    ? campaign.inventory.map(id => ITEMS[id] ? ITEMS[id].icon : '').join(' ')
+    : '';
 
   return `
     <div class="screen map-screen">
       <div class="map-topbar">
         <span class="map-gold">💰 ${campaign.gold}</span>
-        <span class="map-items">${itemIcons}</span>
+        <span class="map-deck">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
         <span class="map-hp">❤️ ${gameState.player.hp}/${gameState.player.maxHp}</span>
       </div>
       <div class="map-container">
-        <div class="map-canvas">
-          ${renderMapPaths()}
-          ${renderMapNodes()}
-          ${renderPlayerMarker()}
-        </div>
+        ${renderVerticalMap(map, campaign, available)}
       </div>
-      ${renderLocationPanel()}
     </div>
   `;
 }
 
-function renderMapNodes() {
-  return Object.entries(LOCATIONS).map(([id, loc]) => {
-    if (loc.hidden) return '';
-    const state = gameState.campaign.locationStates[id];
-    const isCurrent = gameState.campaign.currentLocation === id;
-    const canAccess = canAccessLocation(id) && isConnected(gameState.campaign.currentLocation, id);
-    const isLocked = loc.requires && !hasItem(loc.requires);
+function renderVerticalMap(map, campaign, available) {
+  let html = '';
 
-    let statusClass = 'node-unknown';
-    if (state.cleared) statusClass = 'node-cleared';
-    else if (state.visited) statusClass = 'node-visited';
-    else if (state.unlocked && !isLocked) statusClass = 'node-available';
-    else if (state.unlocked && isLocked) statusClass = 'node-locked';
-
-    const nodeStyle = loc.image
-      ? `background-image: url('${loc.image}')`
-      : '';
-
-    return `
-      <div class="map-node ${statusClass} ${isCurrent ? 'node-current' : ''} ${canAccess ? 'node-tappable' : ''}"
-           style="left: ${loc.mapPos.x}%; top: ${loc.mapPos.y}%"
-           onclick="${canAccess || isCurrent ? `onMapNodeTap('${id}')` : ''}">
-        <span class="node-icon" style="${nodeStyle}"></span>
-        <span class="node-label">${loc.name}</span>
-        ${isLocked ? '<span class="node-lock">🔒</span>' : ''}
+  // Boss node at top
+  const bossAvail = available.includes(map.boss);
+  html += `
+    <div class="map-row map-row-boss">
+      <div class="map-node ${bossAvail ? 'node-available' : 'node-locked'} ${map.boss.visited ? 'node-visited' : ''}"
+           onclick="${bossAvail ? `onNodeSelect(${MAP_CONFIG.acts}, 0)` : ''}">
+        <span class="node-icon">${NODE_ICONS[NODE_TYPES.BOSS]}</span>
+        <span class="node-label">Dragon's Lair</span>
       </div>
-    `;
-  }).join('');
-}
+    </div>
+  `;
 
-function renderMapPaths() {
-  // SVG lines connecting locations
-  const drawn = new Set();
-  let paths = '';
+  // Acts in reverse (top = later acts)
+  for (let act = MAP_CONFIG.acts - 1; act >= 0; act--) {
+    const actNodes = map.acts[act];
+    html += `<div class="map-row">`;
+    html += `<span class="map-act-label">Act ${act + 1}</span>`;
+    html += `<div class="map-row-nodes">`;
+    for (let i = 0; i < actNodes.length; i++) {
+      const node = actNodes[i];
+      const isAvail = available.includes(node);
+      const isCurrent = campaign.currentAct === act && campaign.currentNode === i;
+      const isPast = act < campaign.currentAct || (act === campaign.currentAct && node.visited);
 
-  for (const [id, loc] of Object.entries(LOCATIONS)) {
-    if (loc.hidden || !loc.mapPos) continue;
-    for (const connId of loc.connections) {
-      const conn = LOCATIONS[connId];
-      if (!conn || conn.hidden || !conn.mapPos) continue;
-      const key = [id, connId].sort().join('-');
-      if (drawn.has(key)) continue;
-      drawn.add(key);
+      let stateClass = 'node-locked';
+      if (isCurrent) stateClass = 'node-current';
+      else if (isPast) stateClass = 'node-past';
+      else if (isAvail) stateClass = 'node-available';
 
-      const fromState = gameState.campaign.locationStates[id];
-      const toState = gameState.campaign.locationStates[connId];
-      const bothUnlocked = fromState.unlocked && toState.unlocked;
-
-      paths += `<line
-        x1="${loc.mapPos.x}%" y1="${loc.mapPos.y}%"
-        x2="${conn.mapPos.x}%" y2="${conn.mapPos.y}%"
-        class="map-path ${bothUnlocked ? 'path-unlocked' : 'path-locked'}"
-      />`;
+      html += `
+        <div class="map-node ${stateClass}"
+             onclick="${isAvail ? `onNodeSelect(${act}, ${i})` : ''}">
+          <span class="node-icon">${NODE_ICONS[node.type]}</span>
+          <span class="node-label">${nodeTypeName(node.type)}</span>
+        </div>
+      `;
     }
+    html += `</div></div>`;
   }
 
-  return `<svg class="map-paths">${paths}</svg>`;
+  return html;
 }
 
-function renderPlayerMarker() {
-  const loc = LOCATIONS[gameState.campaign.currentLocation];
-  if (!loc || !loc.mapPos) return '';
-  return `<div class="player-marker" style="left: ${loc.mapPos.x}%; top: ${loc.mapPos.y}%">▼</div>`;
+function nodeTypeName(type) {
+  const names = {
+    [NODE_TYPES.BATTLE]: 'Battle',
+    [NODE_TYPES.ELITE]: 'Elite',
+    [NODE_TYPES.REST]: 'Rest',
+    [NODE_TYPES.SHOP]: 'Shop',
+    [NODE_TYPES.EVENT]: 'Event',
+    [NODE_TYPES.BOSS]: 'Boss',
+  };
+  return names[type] || '?';
 }
 
-function renderLocationPanel() {
-  const locId = gameState._selectedLocation || gameState.campaign.currentLocation;
-  const loc = LOCATIONS[locId];
-  if (!loc || loc.hidden) return '<div class="location-panel"></div>';
+function onNodeSelect(act, index) {
+  const node = selectMapNode(act, index);
 
-  const state = gameState.campaign.locationStates[locId];
-  const isCurrent = gameState.campaign.currentLocation === locId;
-  const isLocked = loc.requires && !hasItem(loc.requires);
-  const canTravel = !isCurrent && canAccessLocation(locId) && isConnected(gameState.campaign.currentLocation, locId);
-
-  let actions = '';
-  if (canTravel) {
-    actions += `<button class="btn btn-primary" onclick="doTravel('${locId}')">Travel</button>`;
-  } else if (isCurrent) {
-    if (loc.type === LOCATION_TYPES.BATTLE || loc.type === LOCATION_TYPES.BOSS) {
-      if (!state.cleared) {
-        actions += `<button class="btn btn-primary" onclick="startLocationBattle('${locId}')">Fight</button>`;
-      } else {
-        actions += `<span class="panel-cleared">Cleared ✓</span>`;
-      }
-    }
-    if (loc.features) {
-      if (loc.features.includes('shop')) {
-        actions += `<button class="btn btn-secondary" onclick="openShop()">Shop</button>`;
-      }
-      if (loc.features.includes('rest')) {
-        actions += `<button class="btn btn-secondary" onclick="openRest()">Rest</button>`;
-      }
-      if (loc.features.includes('npc')) {
-        actions += `<button class="btn btn-secondary" onclick="openNpc('${locId}')">Talk</button>`;
-      }
-    }
-    if (loc.event && !state.cleared) {
-      actions += `<button class="btn btn-secondary" onclick="openEvent('${loc.event}')">Explore</button>`;
-    }
-    if (loc.type === LOCATION_TYPES.TREASURE && !state.cleared) {
-      actions += `<button class="btn btn-primary" onclick="openTreasure('${locId}')">Open</button>`;
-    }
-  } else if (isLocked) {
-    const item = ITEMS[loc.requires];
-    actions += `<span class="panel-locked">Requires ${item.icon} ${item.name}</span>`;
+  switch (node.type) {
+    case NODE_TYPES.BATTLE:
+      startNodeBattle(node.enemy, node.goldReward);
+      break;
+    case NODE_TYPES.ELITE:
+      startEliteBattle(node.enemy, node.goldReward);
+      break;
+    case NODE_TYPES.REST:
+      gameState.phase = GAME_PHASES.REST;
+      renderGame();
+      break;
+    case NODE_TYPES.SHOP:
+      gameState._shopCards = getAvailableShopCards();
+      gameState.phase = GAME_PHASES.SHOP;
+      renderGame();
+      break;
+    case NODE_TYPES.EVENT:
+      gameState._currentEvent = node.eventKey;
+      gameState.phase = GAME_PHASES.EVENT;
+      renderGame();
+      break;
+    case NODE_TYPES.BOSS:
+      startNodeBattle(node.enemy, 0);
+      break;
   }
+}
+
+// === REST SCREEN — Heal / Upgrade / Remove ===
+function renderRest() {
+  const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
+  return `
+    <div class="screen rest-screen">
+      <h2 class="screen-title">Campfire</h2>
+      <p class="rest-desc">The fire crackles. Choose wisely.</p>
+      <div class="rest-choices">
+        ${healAmount > 0 ? `
+          <button class="rest-choice" onclick="doRest()">
+            <span class="rest-choice-icon">❤️</span>
+            <span class="rest-choice-label">Rest</span>
+            <span class="rest-choice-desc">Heal ${healAmount} HP</span>
+          </button>
+        ` : ''}
+        <button class="rest-choice" onclick="openUpgradeSelect()">
+          <span class="rest-choice-icon">⬆️</span>
+          <span class="rest-choice-label">Upgrade</span>
+          <span class="rest-choice-desc">Enhance a card</span>
+        </button>
+        <button class="rest-choice" onclick="openRemoveSelect()">
+          <span class="rest-choice-icon">🗑️</span>
+          <span class="rest-choice-label">Remove</span>
+          <span class="rest-choice-desc">Thin your deck</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function doRest() {
+  const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
+  gameState.player.hp += healAmount;
+  addLog(`Rested and healed ${healAmount} HP.`);
+  advanceAfterNode();
+}
+
+function openUpgradeSelect() {
+  gameState._upgradeMode = 'upgrade';
+  gameState.phase = GAME_PHASES.CARD_UPGRADE;
+  renderGame();
+}
+
+function openRemoveSelect() {
+  gameState._upgradeMode = 'remove';
+  gameState.phase = GAME_PHASES.CARD_UPGRADE;
+  renderGame();
+}
+
+// === CARD UPGRADE / REMOVE SCREEN ===
+function renderCardUpgrade() {
+  const mode = gameState._upgradeMode || 'upgrade';
+  const title = mode === 'remove' ? 'Remove a Card' : 'Upgrade a Card';
+  const hint = mode === 'remove' ? 'Select a card to remove from your deck' : 'Select a card to upgrade';
+  const allCards = [...gameState.player.deck, ...gameState.player.discard];
+  const cards = mode === 'upgrade' ? allCards.filter(c => !c.upgraded) : allCards;
 
   return `
-    <div class="location-panel">
-      <div class="panel-name">${loc.name}</div>
-      <div class="panel-desc">${loc.description}</div>
-      <div class="panel-actions">${actions}</div>
+    <div class="screen upgrade-screen">
+      <h2 class="screen-title">${title}</h2>
+      <p class="upgrade-hint">${hint}</p>
+      <div class="upgrade-cards">
+        ${cards.map((card, i) => `
+          <div class="upgrade-card-item" onclick="doCardAction(${i})">
+            ${renderCard(card, -1, false)}
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-skip" onclick="returnToRestScreen()">Cancel</button>
     </div>
   `;
 }
 
-function onMapNodeTap(locId) {
-  const isCurrent = gameState.campaign.currentLocation === locId;
-  if (isCurrent) {
-    gameState._selectedLocation = locId;
-    renderGame();
-    return;
-  }
-  if (canAccessLocation(locId) && isConnected(gameState.campaign.currentLocation, locId)) {
-    doTravel(locId);
-  }
+function returnToRestScreen() {
+  gameState.phase = GAME_PHASES.REST;
+  renderGame();
 }
 
-function doTravel(locId) {
-  travelTo(locId);
-  gameState._selectedLocation = locId;
-  renderGame();
+function doCardAction(index) {
+  const mode = gameState._upgradeMode || 'upgrade';
+  const allCards = [...gameState.player.deck, ...gameState.player.discard];
+  const cards = mode === 'upgrade' ? allCards.filter(c => !c.upgraded) : allCards;
+  const card = cards[index];
+  if (!card) return;
+
+  if (mode === 'remove') {
+    // Find and remove from whichever pile it's in
+    let idx = gameState.player.deck.findIndex(c => c.id === card.id);
+    if (idx >= 0) {
+      gameState.player.deck.splice(idx, 1);
+    } else {
+      idx = gameState.player.discard.findIndex(c => c.id === card.id);
+      if (idx >= 0) gameState.player.discard.splice(idx, 1);
+    }
+    addLog(`Removed ${card.name} from deck.`);
+  } else {
+    // Find the actual card object in deck/discard and upgrade it
+    const actual = gameState.player.deck.find(c => c.id === card.id)
+      || gameState.player.discard.find(c => c.id === card.id);
+    if (actual) {
+      upgradeCard(actual);
+      addLog(`Upgraded ${actual.name}!`);
+    }
+  }
+  advanceAfterNode();
 }
 
 // === SHOP ===
-function openShop() {
-  gameState._shopCards = getAvailableShopCards();
-  gameState.phase = GAME_PHASES.SHOP;
-  renderGame();
-}
-
 function renderShop() {
   const items = gameState._shopCards || [];
   const gold = gameState.campaign.gold;
@@ -183,10 +235,11 @@ function renderShop() {
           </div>
         `).join('')}
       </div>
-      <div class="shop-remove" onclick="${gold >= CARD_REMOVE_PRICE ? 'openCardRemove()' : ''}">
-        <span class="${gold >= CARD_REMOVE_PRICE ? '' : 'shop-item-expensive'}">Remove a card — 💰 ${CARD_REMOVE_PRICE}</span>
+      <div class="shop-remove ${gold >= CARD_REMOVE_PRICE ? '' : 'shop-item-expensive'}"
+           onclick="${gold >= CARD_REMOVE_PRICE ? 'openShopRemove()' : ''}">
+        Remove a card — 💰 ${CARD_REMOVE_PRICE}
       </div>
-      <button class="btn btn-skip" onclick="returnToMap()">Leave</button>
+      <button class="btn btn-skip" onclick="advanceAfterNode()">Leave</button>
     </div>
   `;
 }
@@ -197,134 +250,22 @@ function buyCard(index) {
   gameState.campaign.gold -= item.price;
   gameState.player.deck.push(item.card);
   gameState._shopCards.splice(index, 1);
-  addLog(`Bought ${item.card.name} for ${item.price} gold.`);
+  addLog(`Bought ${item.card.name}.`);
+  renderGame();
+}
+
+function openShopRemove() {
+  gameState._upgradeMode = 'remove';
+  gameState._returnToShop = true;
+  gameState.phase = GAME_PHASES.CARD_UPGRADE;
   renderGame();
 }
 
 function openCardRemove() {
-  gameState.phase = GAME_PHASES.CARD_UPGRADE; // reuse for removal
-  gameState._upgradeMode = 'remove';
-  renderGame();
-}
-
-// === REST ===
-function openRest() {
-  gameState.phase = GAME_PHASES.REST;
-  renderGame();
-}
-
-function renderRest() {
-  const healAmount = Math.min(15, gameState.player.maxHp - gameState.player.hp);
-  return `
-    <div class="screen rest-screen">
-      <h2 class="screen-title">Rest</h2>
-      <p class="rest-desc">The fire crackles warmly. You can recover your strength.</p>
-      <div class="rest-hp">❤️ ${gameState.player.hp} / ${gameState.player.maxHp}</div>
-      ${healAmount > 0 ? `
-        <button class="btn btn-primary" onclick="doRest()">Rest (+${healAmount} HP)</button>
-      ` : `
-        <p class="rest-full">You are at full health.</p>
-      `}
-      <button class="btn btn-skip" onclick="returnToMap()">Leave</button>
-    </div>
-  `;
-}
-
-function doRest() {
-  const healAmount = Math.min(15, gameState.player.maxHp - gameState.player.hp);
-  gameState.player.hp += healAmount;
-  addLog(`Rested and healed ${healAmount} HP.`);
-  returnToMap();
-}
-
-// === NPC DIALOGUE ===
-function openNpc(locId) {
-  const questInfo = getAvailableQuestsAtLocation(locId);
-  gameState._npcQuests = questInfo;
-  gameState._npcQuestIndex = 0;
-  gameState.phase = GAME_PHASES.NPC;
-  renderGame();
-}
-
-function renderNpc() {
-  const quests = gameState._npcQuests || [];
-  if (quests.length === 0) {
-    return `
-      <div class="screen npc-screen">
-        <p class="npc-text">No one has anything to say right now.</p>
-        <button class="btn btn-skip" onclick="returnToMap()">Leave</button>
-      </div>
-    `;
-  }
-
-  const qi = gameState._npcQuestIndex || 0;
-  const current = quests[qi];
-  const { questId, quest, npc, action } = current;
-  const dialogue = quest.dialogue;
-
-  let text = '';
-  let buttons = '';
-
-  switch (action) {
-    case 'offer':
-      text = dialogue.offer;
-      buttons = `
-        <button class="btn btn-primary" onclick="doAcceptQuest('${questId}')">Accept</button>
-        <button class="btn btn-skip" onclick="nextNpc()">Decline</button>
-      `;
-      break;
-    case 'active':
-      text = dialogue.active;
-      buttons = `<button class="btn btn-skip" onclick="nextNpc()">Continue</button>`;
-      break;
-    case 'turnin':
-      text = dialogue.turnin;
-      buttons = `<button class="btn btn-primary" onclick="doTurnInQuest('${questId}')">Claim Reward</button>`;
-      break;
-    case 'done':
-      text = dialogue.done;
-      buttons = `<button class="btn btn-skip" onclick="nextNpc()">Continue</button>`;
-      break;
-  }
-
-  return `
-    <div class="screen npc-screen">
-      <div class="npc-portrait" style="${npc.image ? `background-image: url('${npc.image}')` : ''}">${npc.image ? '' : npc.icon}</div>
-      <div class="npc-name">${npc.name}</div>
-      <div class="npc-quest-name">${quest.name}</div>
-      <div class="npc-text">${text}</div>
-      <div class="npc-buttons">${buttons}</div>
-    </div>
-  `;
-}
-
-function doAcceptQuest(questId) {
-  acceptQuest(questId);
-  nextNpc();
-}
-
-function doTurnInQuest(questId) {
-  turnInQuest(questId);
-  nextNpc();
-}
-
-function nextNpc() {
-  const quests = gameState._npcQuests || [];
-  gameState._npcQuestIndex = (gameState._npcQuestIndex || 0) + 1;
-  if (gameState._npcQuestIndex >= quests.length) {
-    returnToMap();
-  } else {
-    renderGame();
-  }
+  openShopRemove();
 }
 
 // === EVENTS ===
-function openEvent(eventId) {
-  gameState._currentEvent = eventId;
-  gameState.phase = GAME_PHASES.EVENT;
-  renderGame();
-}
-
 function renderEvent() {
   const eventId = gameState._currentEvent;
   const event = EVENTS[eventId];
@@ -335,11 +276,15 @@ function renderEvent() {
       <h2 class="screen-title">${event.title}</h2>
       <p class="event-desc">${event.description}</p>
       <div class="event-choices">
-        ${event.choices.map((choice, i) => `
-          <button class="btn ${choice.cost ? 'btn-primary' : 'btn-secondary'}" onclick="doEventChoice(${i})">
-            ${choice.text}
-          </button>
-        `).join('')}
+        ${event.choices.map((choice, i) => {
+          const canAfford = !choice.cost || (!choice.cost.gold || gameState.campaign.gold >= choice.cost.gold);
+          return `
+            <button class="btn ${choice.cost ? 'btn-primary' : 'btn-secondary'} ${canAfford ? '' : 'btn-disabled'}"
+                    onclick="${canAfford ? `doEventChoice(${i})` : ''}">
+              ${choice.text}
+            </button>
+          `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -354,6 +299,9 @@ function doEventChoice(index) {
       gameState.player.hp = Math.max(1, gameState.player.hp - choice.cost.hp);
       addLog(`Lost ${choice.cost.hp} HP.`);
     }
+    if (choice.cost.gold) {
+      gameState.campaign.gold -= choice.cost.gold;
+    }
   }
 
   if (choice.reward) {
@@ -367,6 +315,19 @@ function doEventChoice(index) {
       gameState.player.deck.push(card);
       addLog(`Gained rare card: ${card.name}!`);
     }
+    if (choice.reward.removeCard) {
+      gameState._upgradeMode = 'remove';
+      gameState.phase = GAME_PHASES.CARD_UPGRADE;
+      renderGame();
+      return;
+    }
+    if (choice.reward.specificCard) {
+      const card = createCard(choice.reward.specificCard);
+      if (card) {
+        gameState.player.deck.push(card);
+        addLog(`Gained ${card.name}!`);
+      }
+    }
     if (choice.reward.cardReward) {
       gameState._rewardCards = getRewardCards(choice.reward.cardCount || 3);
       gameState.phase = GAME_PHASES.CARD_REWARD;
@@ -376,74 +337,24 @@ function doEventChoice(index) {
   }
 
   addLog(choice.result);
-
-  // Mark event location as cleared
-  const locId = gameState.campaign.currentLocation;
-  clearLocation(locId);
-
-  returnToMap();
+  advanceAfterNode();
 }
 
-// === TREASURE ===
-function openTreasure(locId) {
-  const loc = LOCATIONS[locId];
-  clearLocation(locId);
-
-  if (loc.rewards && loc.rewards.healFull) {
-    gameState.player.hp = gameState.player.maxHp;
-    addLog('The healing spring restores you fully!');
-  }
-
-  if (loc.rewards && loc.rewards.rareCard) {
-    const card = getRareCard();
-    gameState.player.deck.push(card);
-    addLog(`Found rare card: ${card.name}!`);
-  }
-
-  returnToMap();
-}
-
-// === CARD UPGRADE / REMOVE ===
-function renderCardUpgrade() {
-  const mode = gameState._upgradeMode || 'upgrade';
-  const title = mode === 'remove' ? 'Remove a Card' : 'Upgrade a Card';
-  const deck = gameState.player.deck;
-
+// === NPC (kept for compatibility but simplified) ===
+function renderNpc() {
   return `
-    <div class="screen upgrade-screen">
-      <h2 class="screen-title">${title}</h2>
-      <p class="upgrade-hint">Select a card from your deck</p>
-      <div class="upgrade-cards">
-        ${deck.map((card, i) => `
-          <div class="upgrade-card-item" onclick="doCardAction(${i})">
-            ${renderCard(card, -1, false)}
-          </div>
-        `).join('')}
-      </div>
-      <button class="btn btn-skip" onclick="returnToMap()">Cancel</button>
+    <div class="screen npc-screen">
+      <p class="npc-text">No one has anything to say right now.</p>
+      <button class="btn btn-skip" onclick="returnToMap()">Leave</button>
     </div>
   `;
 }
 
-function doCardAction(index) {
-  const mode = gameState._upgradeMode || 'upgrade';
-  if (mode === 'remove') {
-    const removed = gameState.player.deck.splice(index, 1)[0];
-    gameState.campaign.gold -= CARD_REMOVE_PRICE;
-    addLog(`Removed ${removed.name} from deck.`);
-  } else {
-    // Upgrade: +2 damage or +2 block
-    const card = gameState.player.deck[index];
-    if (card.damage > 0) {
-      card.damage += 2;
-      card.description = card.description.replace(/\d+/, card.damage);
-      addLog(`Upgraded ${card.name}: +2 damage!`);
-    } else if (card.block > 0) {
-      card.block += 2;
-      card.description = card.description.replace(/\d+/, card.block);
-      addLog(`Upgraded ${card.name}: +2 block!`);
-    }
-    gameState._pendingCardUpgrade = false;
-  }
-  returnToMap();
-}
+function openNpc() { returnToMap(); }
+function doAcceptQuest() {}
+function doTurnInQuest() {}
+function nextNpc() { returnToMap(); }
+function getAvailableQuestsAtLocation() { return []; }
+
+// === TREASURE (used by events) ===
+function openTreasure() { returnToMap(); }
