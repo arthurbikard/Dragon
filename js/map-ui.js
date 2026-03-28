@@ -25,6 +25,7 @@ function renderMap() {
         </div>
       </div>
       ${MAP_DEBUG ? '<div class="map-debug-coords" id="debugCoords">Drag nodes to position them</div>' : ''}
+      <div class="map-debug-coords" id="debugState" style="font-size:0.5rem;max-height:60px;overflow:auto">${renderDebugState()}</div>
       <div class="map-location-panel">
         ${renderLocationPanel()}
       </div>
@@ -148,6 +149,17 @@ function initDragListeners() {
       viewport.style.overflow = 'scroll';
     }
   });
+}
+
+function renderDebugState() {
+  const c = gameState.campaign;
+  if (!c) return 'No campaign';
+  const loc = WORLD.locations[c.currentLocation];
+  const connections = loc ? loc.paths : [];
+  const travelable = connections.filter(id => canTravelTo(id));
+  const explored = [...c.explored].join(', ');
+  const cleared = [...c.cleared].join(', ');
+  return `loc:${c.currentLocation} | explored:[${explored}] | cleared:[${cleared}] | connections:[${connections.join(',')}] | canTravel:[${travelable.join(',')}]`;
 }
 
 function exportNodePositions() {
