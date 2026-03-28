@@ -548,9 +548,11 @@ function handleDeath() {
         return;
       }
 
-      // Elite gives rare card + normal reward
+      // Elite gives 2 rare cards + bonus gold
       if (gameState._battleIsElite) {
-        gameState._rewardCards = [getRareCard(), ...getRewardCards(2)];
+        gameState._rewardCards = [getRareCard(), getRareCard(), ...getRewardCards(1)];
+        gameState.campaign.gold += 10; // bonus gold
+        addLog('Elite defeated! Bonus gold earned.');
       } else {
         gameState._rewardCards = getRewardCards(3);
       }

@@ -49,27 +49,27 @@ const AI_ENEMIES = [
     id: 'thornback',
     name: 'Thornback',
     element: ELEMENTS.EARTH,
-    hp: 48,
-    maxHp: 48,
+    hp: 44,
+    maxHp: 44,
     image: 'images/enemy_forest_wyrm.png',
-    // High thorns — punishes multi-hit, rewards big single strikes
+    // Thorns but lower — still punishes multi-hit but not devastating
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 8, weight: 2 },
-      { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 4, duration: 2 }], weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 14, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
+      { type: INTENT_TYPES.DEFEND, block: 6, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 12, weight: 1 },
     ],
   },
   {
     id: 'storm_caller',
     name: 'Storm Caller',
     element: ELEMENTS.AIR,
-    hp: 42,
-    maxHp: 42,
+    hp: 38,
+    maxHp: 38,
     image: 'images/enemy_storm_wyrm.png',
-    // Buffs itself each turn — snowballs if you don't kill fast
+    // Buffs itself — snowballs but lower HP so fast kills work
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 6, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 1 }], weight: 2 },
       { type: INTENT_TYPES.ATTACK, damage: 10, weight: 1 },
     ],
   },
@@ -79,28 +79,28 @@ const AI_ENEMIES = [
     id: 'iron_golem',
     name: 'Iron Golem',
     element: ELEMENTS.EARTH,
-    hp: 65,
-    maxHp: 65,
+    hp: 52,
+    maxHp: 52,
     image: 'images/enemy_ember_titan.png',
-    // Alternates between huge block and big attacks. Burn bypasses block.
+    // Alternates block and attacks. Lower HP makes it beatable.
     intents: [
-      { type: INTENT_TYPES.DEFEND, block: 18, weight: 3 },
-      { type: INTENT_TYPES.ATTACK, damage: 14, weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 12, weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
     ],
   },
   {
     id: 'shadow_wyrm',
     name: 'Shadow Wyrm',
     element: ELEMENTS.AIR,
-    hp: 55,
-    maxHp: 55,
+    hp: 46,
+    maxHp: 46,
     image: 'images/enemy_storm_wyrm.png',
-    // Applies weak — your attacks do less. Rewards block-heavy play + cleanse.
+    // Applies weak — manageable if you have cleanse or block
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 9, weight: 3 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 15, weight: 1 },
     ],
   },
 
@@ -109,15 +109,15 @@ const AI_ENEMIES = [
     id: 'ancient_dragon',
     name: 'Ancient Dragon',
     element: ELEMENTS.EARTH,
-    hp: 120,
-    maxHp: 120,
+    hp: 140,
+    maxHp: 140,
     image: 'images/enemy_ancient_dragon.png',
     // Multi-phase: mixes everything. Requires a well-built deck.
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 3 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 13, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 24, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 1 },
     ],
   },
 ];

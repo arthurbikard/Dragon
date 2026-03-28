@@ -1418,13 +1418,34 @@ html, body {
   margin-top: 4px;
 }
 
-.shop-remove {
-  font-family: var(--font-body);
-  font-style: italic;
-  font-size: 0.75rem;
-  color: var(--smoke);
+.shop-services {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.shop-service {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--bone);
   cursor: pointer;
-  padding: 8px;
+  padding: 10px 14px;
+  background: rgba(20, 20, 42, 0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  transition: border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shop-service:active { transform: scale(0.97); }
+
+.shop-price-rare {
+  color: var(--gold-bright);
+  font-weight: 900;
 }
 
 /* Rest — Heal / Upgrade / Remove */

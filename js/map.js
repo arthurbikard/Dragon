@@ -103,19 +103,29 @@ const EVENTS = {
 const EVENT_KEYS = Object.keys(EVENTS);
 
 // Shop card pool
+// Shop offers BOTH regular cards AND rare cards (for more gold)
 const SHOP_CARDS = [
-  { templateKey: 'fire_blast', price: 12 },
-  { templateKey: 'tidal_wave', price: 12 },
-  { templateKey: 'earthquake', price: 12 },
-  { templateKey: 'lightning', price: 12 },
-  { templateKey: 'dragon_breath', price: 15 },
-  { templateKey: 'inferno', price: 10 },
-  { templateKey: 'fortify', price: 10 },
-  { templateKey: 'second_wind', price: 10 },
-  { templateKey: 'healing_rain', price: 8 },
+  { templateKey: 'fire_blast', price: 8 },
+  { templateKey: 'tidal_wave', price: 8 },
+  { templateKey: 'earthquake', price: 8 },
+  { templateKey: 'lightning', price: 8 },
+  { templateKey: 'dragon_breath', price: 10 },
+  { templateKey: 'inferno', price: 8 },
+  { templateKey: 'fortify', price: 8 },
+  { templateKey: 'second_wind', price: 8 },
+  { templateKey: 'healing_rain', price: 6 },
 ];
 
-const CARD_REMOVE_PRICE = 8;
+const SHOP_RARE_CARDS = [
+  { rareKey: 'dragon_fury', price: 20 },
+  { rareKey: 'ancient_ward', price: 20 },
+  { rareKey: 'elemental_surge', price: 18 },
+  { rareKey: 'dragons_bane', price: 18 },
+];
+
+const CARD_REMOVE_PRICE = 6;
+const SHOP_HEAL_PRICE = 5;
+const SHOP_HEAL_AMOUNT = 10;
 
 // Rare cards (from elites, events, treasure)
 const RARE_CARD_TEMPLATES = {
@@ -253,10 +263,10 @@ function createMapNode(type, act, index) {
   if (type === NODE_TYPES.BATTLE) {
     const pool = act < 2 ? ENEMY_POOLS.easy : ENEMY_POOLS.medium;
     node.enemy = pool[Math.floor(Math.random() * pool.length)];
-    node.goldReward = 8 + act * 4;
+    node.goldReward = 10 + act * 5;
   } else if (type === NODE_TYPES.ELITE) {
     node.enemy = ENEMY_POOLS.elite[Math.floor(Math.random() * ENEMY_POOLS.elite.length)];
-    node.goldReward = 15 + act * 5;
+    node.goldReward = 20 + act * 5;
   } else if (type === NODE_TYPES.EVENT) {
     node.eventKey = EVENT_KEYS[Math.floor(Math.random() * EVENT_KEYS.length)];
   }
@@ -346,10 +356,31 @@ function advanceToNextAct() {
 }
 
 function getAvailableShopCards() {
-  return shuffleArray(SHOP_CARDS).slice(0, 4).map(item => ({
+  // Mix of 3 regular + 1 rare
+  const regular = shuffleArray(SHOP_CARDS).slice(0, 3).map(item => ({
     card: createCard(item.templateKey),
     price: item.price,
+    type: 'card',
   }));
+  const rareItem = shuffleArray(SHOP_RARE_CARDS)[0];
+  const rareCard = getRareCardByKey(rareItem.rareKey);
+  const rare = rareCard ? [{
+    card: rareCard,
+    price: rareItem.price,
+    type: 'rare',
+  }] : [];
+  return [...regular, ...rare];
+}
+
+function getRareCardByKey(key) {
+  const template = RARE_CARD_TEMPLATES[key];
+  if (!template) return null;
+  return {
+    ...template,
+    templateKey: key,
+    id: _cardId++,
+    effects: template.effects.map(e => ({ ...e })),
+  };
 }
 
 function getRareCard() {

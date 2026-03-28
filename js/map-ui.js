@@ -222,6 +222,7 @@ function doCardAction(index) {
 function renderShop() {
   const items = gameState._shopCards || [];
   const gold = gameState.campaign.gold;
+  const canHeal = gameState.player.hp < gameState.player.maxHp;
 
   return `
     <div class="screen shop-screen">
@@ -231,17 +232,35 @@ function renderShop() {
         ${items.map((item, i) => `
           <div class="shop-item ${gold >= item.price ? '' : 'shop-item-expensive'}" onclick="${gold >= item.price ? `buyCard(${i})` : ''}">
             ${renderCard(item.card, -1, false)}
-            <div class="shop-price">💰 ${item.price}</div>
+            <div class="shop-price ${item.type === 'rare' ? 'shop-price-rare' : ''}">💰 ${item.price}</div>
           </div>
         `).join('')}
       </div>
-      <div class="shop-remove ${gold >= CARD_REMOVE_PRICE ? '' : 'shop-item-expensive'}"
-           onclick="${gold >= CARD_REMOVE_PRICE ? 'openShopRemove()' : ''}">
-        Remove a card — 💰 ${CARD_REMOVE_PRICE}
+      <div class="shop-services">
+        <div class="shop-service ${gold >= CARD_REMOVE_PRICE ? '' : 'shop-item-expensive'}"
+             onclick="${gold >= CARD_REMOVE_PRICE ? 'openShopRemove()' : ''}">
+          🗑️ Remove a card — 💰 ${CARD_REMOVE_PRICE}
+        </div>
+        ${canHeal ? `
+          <div class="shop-service ${gold >= SHOP_HEAL_PRICE ? '' : 'shop-item-expensive'}"
+               onclick="${gold >= SHOP_HEAL_PRICE ? 'buyHeal()' : ''}">
+            ❤️ Heal ${SHOP_HEAL_AMOUNT} HP — 💰 ${SHOP_HEAL_PRICE}
+          </div>
+        ` : ''}
       </div>
       <button class="btn btn-skip" onclick="advanceAfterNode()">Leave</button>
     </div>
   `;
+}
+
+function buyHeal() {
+  if (gameState.campaign.gold < SHOP_HEAL_PRICE) return;
+  const healed = Math.min(SHOP_HEAL_AMOUNT, gameState.player.maxHp - gameState.player.hp);
+  if (healed <= 0) return;
+  gameState.campaign.gold -= SHOP_HEAL_PRICE;
+  gameState.player.hp += healed;
+  addLog(`Bought a potion. Healed ${healed} HP.`);
+  renderGame();
 }
 
 function buyCard(index) {

@@ -612,15 +612,30 @@ function simulateGame(agent, element, ablation) {
 
       if (gameState.phase === GAME_PHASES.SHOP) {
         if (abl === 'No gold (shop disabled)') { advanceAfterNode(); continue; }
+        const gold = gameState.campaign.gold;
+
+        // Buy heal potion if low HP
+        if (gameState.player.hp < gameState.player.maxHp * 0.6 && gold >= SHOP_HEAL_PRICE) {
+          buyHeal();
+          continue;
+        }
+
+        // Try to buy a card
         const items = gameState._shopCards || [];
-        const pick = agent.pickShopCard(items, gameState.campaign.gold);
+        const pick = agent.pickShopCard(items, gold);
         if (pick >= 0) {
           const before = gameState.campaign.gold;
           buyCard(pick);
           stats.goldSpent += before - gameState.campaign.gold;
-          // Stay in shop to potentially buy more
         } else {
-          advanceAfterNode();
+          // Try card removal if deck is big
+          const deckSize = gameState.player.deck.length + gameState.player.discard.length;
+          if (deckSize > 11 && gold >= CARD_REMOVE_PRICE) {
+            gameState._upgradeMode = 'remove';
+            gameState.phase = GAME_PHASES.CARD_UPGRADE;
+          } else {
+            advanceAfterNode();
+          }
         }
         continue;
       }
