@@ -40,34 +40,47 @@ let _dragOffset = { x: 0, y: 0 };
 function initDragListeners() {
   if (!MAP_DEBUG) return;
   const canvas = document.getElementById('worldCanvas');
+  const viewport = document.getElementById('worldViewport');
   if (!canvas) return;
 
-  canvas.addEventListener('pointerdown', (e) => {
+  // Remove old listeners by replacing the canvas event handling
+  canvas._dragInit = true;
+
+  function getCanvasPos(e) {
+    const canvasRect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - canvasRect.left + viewport.scrollLeft,
+      y: e.clientY - canvasRect.top + viewport.scrollTop,
+    };
+  }
+
+  // Use document-level listeners so drag continues even outside the canvas
+  canvas.addEventListener('mousedown', (e) => {
     const node = e.target.closest('.world-location');
     if (!node) return;
     e.preventDefault();
+    e.stopPropagation();
     _dragTarget = node;
-    const rect = node.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    _dragOffset.x = e.clientX - rect.left - rect.width / 2;
-    _dragOffset.y = e.clientY - rect.top - rect.height / 2;
+    const pos = getCanvasPos(e);
+    const nodeLeft = parseFloat(node.style.left) || 0;
+    const nodeTop = parseFloat(node.style.top) || 0;
+    _dragOffset.x = pos.x - nodeLeft;
+    _dragOffset.y = pos.y - nodeTop;
     node.style.zIndex = '100';
+    // Disable scrolling during drag
+    viewport.style.overflow = 'hidden';
   });
 
-  canvas.addEventListener('pointermove', (e) => {
+  document.addEventListener('mousemove', (e) => {
     if (!_dragTarget) return;
     e.preventDefault();
-    const canvas = document.getElementById('worldCanvas');
     const canvasRect = canvas.getBoundingClientRect();
-    const viewport = document.getElementById('worldViewport');
-
-    const x = e.clientX - canvasRect.left - _dragOffset.x;
-    const y = e.clientY - canvasRect.top - _dragOffset.y;
+    const x = e.clientX - canvasRect.left + viewport.scrollLeft - _dragOffset.x;
+    const y = e.clientY - canvasRect.top + viewport.scrollTop - _dragOffset.y;
 
     _dragTarget.style.left = x + 'px';
     _dragTarget.style.top = y + 'px';
 
-    // Show coordinates
     const locId = _dragTarget.dataset.locId;
     const gridX = (x / TILE_SIZE).toFixed(1);
     const gridY = (y / TILE_SIZE).toFixed(1);
@@ -75,19 +88,61 @@ function initDragListeners() {
     if (debugEl) {
       debugEl.textContent = `${locId}: x=${gridX}, y=${gridY}`;
     }
+
+    // Also update SVG paths live
+    renderWorldPaths();
   });
 
-  canvas.addEventListener('pointerup', () => {
+  document.addEventListener('mouseup', () => {
     if (_dragTarget) {
       _dragTarget.style.zIndex = '';
       _dragTarget = null;
+      viewport.style.overflow = 'scroll';
     }
   });
 
-  canvas.addEventListener('pointerleave', () => {
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    const node = e.target.closest('.world-location');
+    if (!node) return;
+    e.preventDefault();
+    _dragTarget = node;
+    const touch = e.touches[0];
+    const pos = getCanvasPos(touch);
+    const nodeLeft = parseFloat(node.style.left) || 0;
+    const nodeTop = parseFloat(node.style.top) || 0;
+    _dragOffset.x = pos.x - nodeLeft;
+    _dragOffset.y = pos.y - nodeTop;
+    node.style.zIndex = '100';
+    viewport.style.overflow = 'hidden';
+  }, { passive: false });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!_dragTarget) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const canvasRect = canvas.getBoundingClientRect();
+    const x = touch.clientX - canvasRect.left + viewport.scrollLeft - _dragOffset.x;
+    const y = touch.clientY - canvasRect.top + viewport.scrollTop - _dragOffset.y;
+
+    _dragTarget.style.left = x + 'px';
+    _dragTarget.style.top = y + 'px';
+
+    const locId = _dragTarget.dataset.locId;
+    const gridX = (x / TILE_SIZE).toFixed(1);
+    const gridY = (y / TILE_SIZE).toFixed(1);
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) {
+      debugEl.textContent = `${locId}: x=${gridX}, y=${gridY}`;
+    }
+    renderWorldPaths();
+  }, { passive: false });
+
+  document.addEventListener('touchend', () => {
     if (_dragTarget) {
       _dragTarget.style.zIndex = '';
       _dragTarget = null;
+      viewport.style.overflow = 'scroll';
     }
   });
 }
