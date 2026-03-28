@@ -131,6 +131,7 @@ function renderLocationPanel() {
   const biome = WORLD.biomes[loc.biome];
 
   let actions = '';
+  const isCombat = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type);
 
   if (!cleared) {
     switch (loc.type) {
@@ -139,6 +140,9 @@ function renderLocationPanel() {
       case LOC_TYPES.MINI_BOSS:
       case LOC_TYPES.BOSS:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Fight</button>`;
+        if (isCombat) {
+          actions += `<span class="panel-blocked">⚠ Must fight to proceed</span>`;
+        }
         break;
       case LOC_TYPES.SHOP:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Enter Shop</button>`;

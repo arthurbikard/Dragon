@@ -255,7 +255,8 @@ function isCleared(locId) {
 
 function canTravelTo(locId) {
   const campaign = gameState.campaign;
-  const currentLoc = WORLD.locations[campaign.currentLocation];
+  const currentLocId = campaign.currentLocation;
+  const currentLoc = WORLD.locations[currentLocId];
   if (!currentLoc) return false;
 
   // Must be connected to current location
@@ -264,7 +265,15 @@ function canTravelTo(locId) {
   // Must be explored
   if (!campaign.explored.has(locId)) return false;
 
-  // Check blessing requirements (for future biome gating)
+  // If current location is an uncleared combat node, you can only
+  // go BACK (to a visited location) — you must fight to go forward
+  const isCombatType = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(currentLoc.type);
+  if (isCombatType && !campaign.cleared.has(currentLocId)) {
+    // Can only retreat to a previously visited location
+    if (!campaign.visited.has(locId)) return false;
+  }
+
+  // Check blessing requirements
   const targetLoc = WORLD.locations[locId];
   if (targetLoc && targetLoc.requiresBlessing) {
     if (!campaign.blessings[targetLoc.requiresBlessing]) return false;
