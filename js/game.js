@@ -565,9 +565,9 @@ function handleDeath() {
         gameState._miniBossBlessing = null;
       }
 
-      // Boss defeated = victory
+      // Boss or mini-boss (if no further biomes) = victory
       const loc = locId ? WORLD.locations[locId] : null;
-      if (loc && loc.type === LOC_TYPES.BOSS) {
+      if (loc && (loc.type === LOC_TYPES.BOSS || loc.type === LOC_TYPES.MINI_BOSS)) {
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
         return;
