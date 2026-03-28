@@ -3,7 +3,8 @@
 // === WORLD MAP SCREEN ===
 
 // Dev mode: toggled from the menu screen
-let MAP_DEBUG = false;
+// Using var so it's accessible across script tags
+var MAP_DEBUG = false;
 
 function renderMap() {
   const campaign = gameState.campaign;
