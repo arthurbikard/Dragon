@@ -67,6 +67,11 @@ function startAIGame(element) {
   gameState.campaign = createCampaignState();
   gameState.phase = GAME_PHASES.MAP;
   renderGame();
+  requestAnimationFrame(() => {
+    renderWorldPaths();
+    scrollToCurrentLocation();
+    initDragListeners();
+  });
 }
 
 function startNodeBattle(enemyId, goldReward) {
