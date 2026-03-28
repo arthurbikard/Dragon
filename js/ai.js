@@ -26,7 +26,7 @@ const AI_ENEMIES = [
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
       { type: INTENT_TYPES.DEFEND, block: 5, weight: 2 },
-      { type: INTENT_TYPES.ATTACK, damage: 4, effects: [{ type: 'burn', value: 2, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 6, weight: 1 },
     ],
   },
   // Dark Forest: Forest Wyrm (medium-hard)
@@ -56,7 +56,7 @@ const AI_ENEMIES = [
       { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 4, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 16, weight: 1 },
     ],
   },
   // Dragon's Lair: Ancient Dragon (tough final boss)
@@ -64,14 +64,14 @@ const AI_ENEMIES = [
     id: 'ancient_dragon',
     name: 'Ancient Dragon',
     element: ELEMENTS.EARTH,
-    hp: 72,
-    maxHp: 72,
+    hp: 100,
+    maxHp: 100,
     image: 'images/enemy_ancient_dragon.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 11, weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 20, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 12, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'burn', value: 3, duration: 3 }, { type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
 ];

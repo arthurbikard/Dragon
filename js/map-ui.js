@@ -214,7 +214,7 @@ function openRest() {
 }
 
 function renderRest() {
-  const healAmount = Math.min(12, gameState.player.maxHp - gameState.player.hp);
+  const healAmount = Math.min(15, gameState.player.maxHp - gameState.player.hp);
   return `
     <div class="screen rest-screen">
       <h2 class="screen-title">Rest</h2>
@@ -231,7 +231,7 @@ function renderRest() {
 }
 
 function doRest() {
-  const healAmount = Math.min(12, gameState.player.maxHp - gameState.player.hp);
+  const healAmount = Math.min(15, gameState.player.maxHp - gameState.player.hp);
   gameState.player.hp += healAmount;
   addLog(`Rested and healed ${healAmount} HP.`);
   returnToMap();
@@ -357,6 +357,11 @@ function doEventChoice(index) {
   }
 
   if (choice.reward) {
+    if (choice.reward.heal) {
+      const healed = Math.min(choice.reward.heal, gameState.player.maxHp - gameState.player.hp);
+      gameState.player.hp += healed;
+      if (healed > 0) addLog(`Healed ${healed} HP.`);
+    }
     if (choice.reward.rareCard) {
       const card = getRareCard();
       gameState.player.deck.push(card);

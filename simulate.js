@@ -67,6 +67,33 @@ const AGENT_FILTER = args.agent || 'default';
 const FORCE_ELEMENT = args.element || null;
 const VERBOSE = !!args.verbose;
 const JSON_OUTPUT = !!args.json;
+const ABLATION_MODE = args.ablation || null;
+
+// === Ablation Definitions ===
+const ABLATIONS = {
+  none:          { name: 'Baseline (no ablation)', apply() {} },
+  no_gold:       { name: 'No gold (shop disabled)', apply() { gameState.campaign.gold = -9999; } },
+  no_rest:       { name: 'No resting', apply() { /* handled in simulateMapTurn */ } },
+  no_rewards:    { name: 'No card rewards', apply() { /* handled in card reward phase */ } },
+  no_quests:     { name: 'No NPCs/quests', apply() { /* handled in simulateMapTurn */ } },
+  no_events:     { name: 'No events', apply() { /* handled in simulateMapTurn */ } },
+  no_block:      { name: 'No block cards in deck', apply() {
+    gameState.player.deck = gameState.player.deck.filter(c => c.block === 0);
+  }},
+  no_statuses:   { name: 'No status effects', apply() {
+    // Monkey-patch applyEffect to no-op for offensive statuses
+    const orig = applyEffect;
+    applyEffect = (effect, caster, target) => {
+      if (['burn', 'vulnerable', 'thorns'].includes(effect.type)) return;
+      orig(effect, caster, target);
+    };
+  }},
+  no_crystal:    { name: 'No Crystal Cave', apply() {
+    LOCATIONS.crystal_cave.requires = '__impossible__';
+  }},
+  direct_path:   { name: 'Direct path only (no side content)', apply() { /* handled in map */ } },
+  double_enemy:  { name: 'Double enemy HP', apply() { /* handled before battle */ } },
+};
 
 // === Agent Strategies ===
 
@@ -495,10 +522,11 @@ const AGENTS = {
  * Simulates a single complete campaign run.
  * Returns detailed stats about the run.
  */
-function simulateGame(agent, element) {
+function simulateGame(agent, element, ablation) {
   const stats = {
     agent: agent.name,
     element,
+    ablation: ablation ? ablation.name : 'none',
     won: false,
     diedAt: null,
     locationsVisited: 0,
@@ -516,6 +544,7 @@ function simulateGame(agent, element) {
   };
 
   const MAX_ACTIONS = 2000; // safety limit
+  const abl = ablation ? ablation.name : null;
 
   try {
     // Init game
@@ -526,6 +555,10 @@ function simulateGame(agent, element) {
     gameState.phase = GAME_PHASES.MAP;
     _mapVisitCount = {};
     _mapStateKey = '';
+
+    // Apply ablation
+    _activeAblation = ablation ? ablation.name : null;
+    if (ablation && ablation.apply) ablation.apply();
 
     let actions = 0;
 
@@ -551,11 +584,21 @@ function simulateGame(agent, element) {
       }
 
       if (gameState.phase === GAME_PHASES.BATTLE) {
+        // Double enemy HP ablation
+        if (abl === 'Double enemy HP' && gameState.enemy && !gameState.enemy._doubled) {
+          gameState.enemy.hp *= 2;
+          gameState.enemy.maxHp *= 2;
+          gameState.enemy._doubled = true;
+        }
         simulateBattleTurn(agent, stats);
         continue;
       }
 
       if (gameState.phase === GAME_PHASES.CARD_REWARD) {
+        if (abl === 'No card rewards') {
+          skipReward();
+          continue;
+        }
         const cards = gameState._rewardCards || [];
         if (cards.length > 0) {
           const pick = agent.pickReward(cards);
@@ -571,6 +614,7 @@ function simulateGame(agent, element) {
       }
 
       if (gameState.phase === GAME_PHASES.SHOP) {
+        if (abl === 'No gold (shop disabled)') { returnToMap(); continue; }
         const items = gameState._shopCards || [];
         // Expert: consider card removal first
         if (agent.shouldRemoveCard && agent.shouldRemoveCard(gameState.player.deck, gameState.campaign.gold)) {
@@ -589,6 +633,7 @@ function simulateGame(agent, element) {
       }
 
       if (gameState.phase === GAME_PHASES.REST) {
+        if (abl === 'No resting') { returnToMap(); continue; }
         if (agent.shouldRest(gameState.player)) {
           doRest();
         } else {
@@ -598,6 +643,7 @@ function simulateGame(agent, element) {
       }
 
       if (gameState.phase === GAME_PHASES.NPC) {
+        if (abl === 'No NPCs/quests') { returnToMap(); continue; }
         const quests = gameState._npcQuests || [];
         const qi = gameState._npcQuestIndex || 0;
         if (qi >= quests.length) {
@@ -617,6 +663,7 @@ function simulateGame(agent, element) {
       }
 
       if (gameState.phase === GAME_PHASES.EVENT) {
+        if (abl === 'No events') { returnToMap(); continue; }
         const eventId = gameState._currentEvent;
         const event = EVENTS[eventId];
         if (event) {
@@ -673,8 +720,10 @@ function simulateGame(agent, element) {
 // Track what we've done to prevent infinite loops
 let _mapVisitCount = {};
 let _mapStateKey = '';
+let _activeAblation = null;
 
 function simulateMapTurn(agent, stats) {
+  const abl = _activeAblation;
   const campaign = gameState.campaign;
   const currentId = campaign.currentLocation;
   const currentLoc = LOCATIONS[currentId];
@@ -700,7 +749,8 @@ function simulateMapTurn(agent, stats) {
       return;
     }
 
-    if (currentLoc.features && currentLoc.features.includes('npc') && visitCount <= 1) {
+    if (abl !== 'No NPCs/quests' && abl !== 'Direct path only (no side content)' &&
+        currentLoc.features && currentLoc.features.includes('npc') && visitCount <= 1) {
       const quests = getAvailableQuestsAtLocation(currentId);
       const actionable = quests.filter(q => q.action === 'offer' || q.action === 'turnin');
       if (actionable.length > 0) {
@@ -709,13 +759,15 @@ function simulateMapTurn(agent, stats) {
       }
     }
 
-    if (currentLoc.features && currentLoc.features.includes('rest') && visitCount <= 1 &&
+    if (abl !== 'No resting' && abl !== 'Direct path only (no side content)' &&
+        currentLoc.features && currentLoc.features.includes('rest') && visitCount <= 1 &&
         agent.shouldRest(gameState.player)) {
       openRest();
       return;
     }
 
-    if (currentLoc.features && currentLoc.features.includes('shop') && visitCount <= 1) {
+    if (abl !== 'No gold (shop disabled)' && abl !== 'Direct path only (no side content)' &&
+        currentLoc.features && currentLoc.features.includes('shop') && visitCount <= 1) {
       const items = getAvailableShopCards();
       if (agent.pickShopCard(items.map((i, idx) => ({ ...i, idx })), campaign.gold) >= 0) {
         openShop();
@@ -723,7 +775,8 @@ function simulateMapTurn(agent, stats) {
       }
     }
 
-    if (currentLoc.event && !campaign.locationStates[currentId].cleared && visitCount <= 1) {
+    if (abl !== 'No events' && abl !== 'Direct path only (no side content)' &&
+        currentLoc.event && !campaign.locationStates[currentId].cleared && visitCount <= 1) {
       openEvent(currentLoc.event);
       return;
     }
@@ -913,7 +966,7 @@ function runSimulations() {
 
     for (const element of elements) {
       for (let i = 0; i < NUM_RUNS; i++) {
-        const result = simulateGame(agent, element);
+        const result = simulateGame(agent, element, null);
         results.push(result);
 
         if (VERBOSE) {
@@ -1019,4 +1072,58 @@ function runSimulations() {
   }
 }
 
-runSimulations();
+function runAblations() {
+  const elements = FORCE_ELEMENT ? [FORCE_ELEMENT] : ['fire', 'water', 'earth', 'air'];
+  const agent = AGENTS.optimal; // always test with optimal
+  const ablationKeys = ABLATION_MODE === 'all'
+    ? Object.keys(ABLATIONS)
+    : [ABLATION_MODE];
+
+  console.log(`\n🔬 Ablation Tests (${agent.name} agent)`);
+  console.log(`   Runs: ${NUM_RUNS} per ablation × ${elements.length} elements\n`);
+
+  const rows = [];
+
+  for (const ablKey of ablationKeys) {
+    const abl = ABLATIONS[ablKey];
+    if (!abl) { console.error(`Unknown ablation: ${ablKey}`); continue; }
+
+    const results = [];
+    for (const element of elements) {
+      for (let i = 0; i < NUM_RUNS; i++) {
+        results.push(simulateGame(agent, element, abl));
+      }
+    }
+
+    const total = results.length;
+    const wins = results.filter(r => r.won).length;
+    const errors = results.filter(r => r.error).length;
+    const winRate = (wins / total * 100).toFixed(1);
+    const avgHp = wins > 0 ? (results.filter(r => r.won).reduce((s, r) => s + r.finalHp, 0) / wins).toFixed(1) : '-';
+
+    rows.push({ name: abl.name, winRate: parseFloat(winRate), wins, total, avgHp, errors });
+    console.log(`  ${abl.name.padEnd(40)} Win: ${winRate}% (${wins}/${total})  AvgHP: ${avgHp}  Err: ${errors}`);
+  }
+
+  // Summary table
+  console.log('\n━━━ Ablation Summary ━━━');
+  const baseline = rows.find(r => r.name.includes('Baseline'));
+  const baselineWr = baseline ? baseline.winRate : 0;
+  for (const row of rows) {
+    const delta = (row.winRate - baselineWr).toFixed(1);
+    const sign = parseFloat(delta) >= 0 ? '+' : '';
+    const impact = Math.abs(parseFloat(delta)) < 1 ? '🟡 Negligible'
+      : parseFloat(delta) < -5 ? '🔴 Critical mechanic'
+      : parseFloat(delta) < 0 ? '🟠 Important'
+      : parseFloat(delta) > 5 ? '🟢 Mechanic is a trap (helps to skip)'
+      : '⚪ Minor';
+    console.log(`  ${row.name.padEnd(40)} ${String(row.winRate + '%').padEnd(8)} ${sign}${delta}pp  ${impact}`);
+  }
+  console.log('');
+}
+
+if (ABLATION_MODE) {
+  runAblations();
+} else {
+  runSimulations();
+}

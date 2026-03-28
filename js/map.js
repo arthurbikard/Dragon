@@ -131,17 +131,17 @@ const ITEMS = {
 const EVENTS = {
   temple_altar: {
     title: 'The Sacred Altar',
-    description: 'An ancient altar glows with faint energy. A sacrifice might yield power.',
+    description: 'An ancient altar glows with warm energy. It offers a blessing to those who seek it.',
     choices: [
-      { text: 'Offer 8 HP to the altar', cost: { hp: 8 }, reward: { rareCard: true }, result: 'The altar flares with light. Power surges into a card.' },
+      { text: 'Pray at the altar', cost: null, reward: { rareCard: true, heal: 8 }, result: 'The altar blazes with light. You feel renewed, and power fills a new card.' },
       { text: 'Walk away', cost: null, reward: null, result: 'You leave the altar undisturbed.' },
     ],
   },
   wanderers_gamble: {
     title: "The Wanderer's Gamble",
-    description: '"Care to test your luck, traveler?" The wanderer grins, shuffling strange cards.',
+    description: '"I have something that might interest you, traveler." The wanderer reveals glowing cards.',
     choices: [
-      { text: 'Pay 10 HP to gamble', cost: { hp: 10 }, reward: { cardReward: true, cardCount: 2 }, result: 'Pain courses through you, but new power materializes.' },
+      { text: 'Accept the gift', cost: null, reward: { cardReward: true, cardCount: 3 }, result: 'The wanderer smiles and hands you powerful cards.' },
       { text: 'Decline politely', cost: null, reward: null, result: 'The wanderer shrugs and stokes the fire.' },
     ],
   },
@@ -149,16 +149,16 @@ const EVENTS = {
 
 // Shop card pool with prices
 const SHOP_CARDS = [
-  { templateKey: 'fire_blast', price: 15 },
-  { templateKey: 'tidal_wave', price: 15 },
-  { templateKey: 'earthquake', price: 15 },
-  { templateKey: 'lightning', price: 15 },
-  { templateKey: 'dragon_breath', price: 20 },
-  { templateKey: 'inferno', price: 12 },
-  { templateKey: 'ice_barrier', price: 10 },
-  { templateKey: 'fortify', price: 12 },
-  { templateKey: 'second_wind', price: 12 },
-  { templateKey: 'healing_rain', price: 10 },
+  { templateKey: 'fire_blast', price: 12 },
+  { templateKey: 'tidal_wave', price: 12 },
+  { templateKey: 'earthquake', price: 12 },
+  { templateKey: 'lightning', price: 12 },
+  { templateKey: 'dragon_breath', price: 15 },
+  { templateKey: 'inferno', price: 10 },
+  { templateKey: 'ice_barrier', price: 8 },
+  { templateKey: 'fortify', price: 10 },
+  { templateKey: 'second_wind', price: 10 },
+  { templateKey: 'healing_rain', price: 8 },
 ];
 
 const CARD_REMOVE_PRICE = 10;
@@ -170,33 +170,44 @@ const RARE_CARD_TEMPLATES = {
     type: CARD_TYPES.ATTACK,
     element: null,
     cost: 2,
-    damage: 16,
+    damage: 20,
     block: 0,
-    effects: [{ type: 'burn', value: 3, duration: 2 }],
-    description: 'Deal 16 damage. Apply 3 Burn for 2 turns.',
-    image: 'images/card_dragon_breath.png', // reuse existing for now
+    effects: [{ type: 'vulnerable', value: 1, duration: 2 }],
+    description: 'Deal 20 damage. Apply Vulnerable for 2 turns.',
+    image: 'images/card_dragon_breath.png',
   },
   ancient_ward: {
     name: 'Ancient Ward',
     type: CARD_TYPES.BLOCK,
     element: null,
-    cost: 2,
+    cost: 1,
     damage: 0,
-    block: 16,
-    effects: [{ type: 'thorns', value: 4, duration: 3 }],
-    description: 'Gain 16 Block. Gain 4 Thorns for 3 turns.',
+    block: 14,
+    effects: [{ type: 'thorns', value: 3, duration: 3 }],
+    description: 'Gain 14 Block. Gain 3 Thorns for 3 turns.',
     image: 'images/card_dragon_scales.png',
   },
   elemental_surge: {
     name: 'Elemental Surge',
     type: CARD_TYPES.SKILL,
     element: null,
-    cost: 1,
+    cost: 0,
     damage: 0,
     block: 0,
     effects: [{ type: 'gainEnergy', value: 2 }, { type: 'draw', value: 2 }],
     description: 'Gain 2 Energy. Draw 2 cards.',
     image: 'images/card_second_wind.png',
+  },
+  dragons_bane: {
+    name: "Dragon's Bane",
+    type: CARD_TYPES.ATTACK,
+    element: null,
+    cost: 1,
+    damage: 12,
+    block: 4,
+    effects: [],
+    description: 'Deal 12 damage. Gain 4 Block.',
+    image: 'images/card_dragon_claw.png',
   },
 };
 
