@@ -43,95 +43,97 @@ const WORLD = {
 
   locations: {
     // === WHISPERING COAST ===
-    starting_village: {
-      name: 'Starting Village',
+    // Positions calibrated to coast_map_bg.png (1200x500 canvas, TILE_SIZE=70)
+    // Map layout left→right: Lighthouse, Veering, Whispering Cliffs, Misthaven, Reef Shallows, Wild Shore
+    misthaven_village: {
+      name: 'Misthaven Village',
       biome: 'coast',
       type: LOC_TYPES.NPC,
-      x: 8, y: 4,
-      paths: ['fishermans_cove'],
-      description: 'A quiet fishing village at the edge of the world. The elder waits by the fire.',
+      x: 8.5, y: 4.5,
+      paths: ['whispering_cliffs'],
+      description: 'A weathered fishing village nestled in a sheltered cove. The elder keeps watch from his hearth.',
       image: 'images/loc_village.png',
       npc: {
         name: 'Village Elder',
         image: 'images/npc_elder.png',
         icon: '👴',
         dialogue: [
-          'Welcome, traveler. Strange things stir in the east.',
+          'Welcome to Misthaven, traveler. Strange things stir beyond our shores.',
           'An ancient dragon has awakened deep in the volcanic heart of our islands.',
-          'Its corruption spreads — the fog, the dead fish, the twisted creatures.',
+          'Its corruption spreads — the fog, the dead fish, the twisted creatures on the cliffs.',
           'You must journey inland. Seek the old temples. Find a way to stop it.',
-          'Take this advice: build your strength before facing the darkness.',
+          'Start by heading west along the Whispering Cliffs. But beware what lurks there.',
         ],
       },
     },
-    fishermans_cove: {
-      name: "Fisherman's Cove",
+    whispering_cliffs: {
+      name: 'Whispering Cliffs',
       biome: 'coast',
       type: LOC_TYPES.BATTLE,
-      x: 6, y: 3,
-      paths: ['starting_village', 'sea_cave', 'shore_market'],
-      description: 'Nets lie torn on the rocks. Something lurks in the shallows.',
+      x: 6.5, y: 3.5,
+      paths: ['misthaven_village', 'the_veering', 'reef_shallows'],
+      description: 'The wind howls through narrow passages in the rock. Claw marks scar the cliff face.',
       image: 'images/loc_misty_shore.png',
       enemy: 'young_drake',
       goldReward: 10,
     },
-    sea_cave: {
-      name: 'Sea Cave',
+    the_veering: {
+      name: 'The Veering',
       biome: 'coast',
       type: LOC_TYPES.EVENT,
       x: 4, y: 2,
-      paths: ['fishermans_cove', 'lighthouse'],
-      description: 'A dark cave mouth gapes in the cliff face. Strange sounds echo from within.',
+      paths: ['whispering_cliffs', 'windward_lighthouse'],
+      description: 'The coastal path twists sharply here. Ancient stones mark a hidden shrine beneath the overhang.',
       image: 'images/loc_crystal_cave.png',
       eventKey: 'sea_cave_event',
     },
-    shore_market: {
-      name: 'Shore Market',
-      biome: 'coast',
-      type: LOC_TYPES.SHOP,
-      x: 9, y: 2,
-      paths: ['fishermans_cove', 'tide_pools', 'driftwood_camp'],
-      description: 'A few merchants still trade here, despite the dangers.',
-      image: 'images/loc_village.png',
-    },
-    lighthouse: {
-      name: 'Lighthouse',
+    windward_lighthouse: {
+      name: 'Windward Lighthouse',
       biome: 'coast',
       type: LOC_TYPES.ELITE,
-      x: 2, y: 3,
-      paths: ['sea_cave', 'tide_pools'],
-      description: 'The light has gone dark. A powerful creature has claimed the tower.',
+      x: 1.2, y: 3.5,
+      paths: ['the_veering', 'reef_shallows'],
+      description: 'The great lighthouse stands dark. A powerful serpent has coiled around its base, snuffing the flame.',
       image: 'images/loc_dragons_lair.png',
       enemy: 'coastal_serpent',
       goldReward: 20,
     },
-    tide_pools: {
-      name: 'Tide Pools',
+    reef_shallows: {
+      name: 'Reef Shallows',
       biome: 'coast',
       type: LOC_TYPES.REST,
-      x: 5, y: 1,
-      paths: ['lighthouse', 'shore_market', 'coast_end'],
-      description: 'Warm pools among the rocks. A good place to rest and prepare.',
+      x: 10, y: 1.5,
+      paths: ['windward_lighthouse', 'whispering_cliffs', 'the_wild_shore'],
+      description: 'Sheltered tidal pools steam gently in the afternoon sun. A safe place to rest and mend.',
       image: 'images/loc_wanderers_camp.png',
     },
-    driftwood_camp: {
-      name: 'Driftwood Camp',
+    the_wild_shore: {
+      name: 'The Wild Shore',
       biome: 'coast',
       type: LOC_TYPES.BATTLE,
-      x: 12, y: 3,
-      paths: ['shore_market', 'coast_end'],
-      description: 'Wreckage from ships piles high. Creatures nest among the debris.',
+      x: 13, y: 2.5,
+      paths: ['reef_shallows', 'wild_shire'],
+      description: 'Driftwood and wreckage litter the untamed beach. Creatures nest among the debris.',
       image: 'images/loc_misty_shore.png',
       enemy: 'young_drake',
       goldReward: 12,
     },
-    coast_end: {
+    wild_shire: {
+      name: 'The Wild Shire',
+      biome: 'coast',
+      type: LOC_TYPES.SHOP,
+      x: 14.5, y: 4,
+      paths: ['the_wild_shore', 'storm_bluff'],
+      description: 'A rugged outpost where smugglers and wanderers trade in rare goods.',
+      image: 'images/loc_village.png',
+    },
+    storm_bluff: {
       name: 'Storm Bluff',
       biome: 'coast',
       type: LOC_TYPES.MINI_BOSS,
-      x: 14, y: 1,
-      paths: ['tide_pools', 'driftwood_camp'],
-      description: 'The path ends at a windswept cliff. A powerful drake guards the passage to the forest beyond.',
+      x: 15.5, y: 1.5,
+      paths: ['wild_shire', 'reef_shallows'],
+      description: 'The path ends at a windswept cliff. A powerful storm drake guards the passage to the forest beyond.',
       image: 'images/loc_volcano_peak.png',
       enemy: 'storm_drake',
       goldReward: 25,
@@ -221,7 +223,7 @@ function createCampaignState() {
   const visited = new Set();
 
   // Start at starting_village, explore it and its connections
-  const startId = 'starting_village';
+  const startId = 'misthaven_village';
   explored.add(startId);
   visited.add(startId);
   const startLoc = WORLD.locations[startId];

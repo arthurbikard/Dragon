@@ -1254,8 +1254,8 @@ html, body {
 /* Canvas: sized to match the coast map panoramic aspect ratio */
 .world-canvas {
   position: relative;
-  width: 1200px;
-  height: 500px;
+  width: 1250px;
+  height: 480px;
   padding: 20px;
   background-image: url('images/coast_map_bg.png');
   background-size: cover;
