@@ -249,9 +249,10 @@ function renderWorldPaths() {
       const biome = WORLD.biomes[loc.biome];
       const pathColor = biome ? biome.palette.path : 'rgba(255,255,255,0.15)';
 
+      // Lines connect to center of nodes (nodes use translate(-50%,-50%))
       paths += `<line
-        x1="${fromPos.x + 22}" y1="${fromPos.y + 22}"
-        x2="${toPos.x + 22}" y2="${toPos.y + 22}"
+        x1="${fromPos.x}" y1="${fromPos.y}"
+        x2="${toPos.x}" y2="${toPos.y}"
         stroke="${pathColor}" stroke-width="2" stroke-linecap="round"
       />`;
     }

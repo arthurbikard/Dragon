@@ -294,6 +294,11 @@ function travelTo(locId) {
 
 function clearLocation(locId) {
   gameState.campaign.cleared.add(locId);
+  // Re-explore connections from this location (in case they weren't revealed)
+  const loc = WORLD.locations[locId];
+  if (loc && loc.paths) {
+    loc.paths.forEach(id => gameState.campaign.explored.add(id));
+  }
 }
 
 function getConnectedLocations() {
