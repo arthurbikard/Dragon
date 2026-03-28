@@ -7,6 +7,7 @@ const GAME_PHASES = {
   BATTLE: 'battle',
   CARD_REWARD: 'card_reward',
   PASS_DEVICE: 'pass_device',
+  PVP_RESOLVE: 'pvp_resolve',
   GAME_OVER: 'game_over',
   VICTORY: 'victory',
 };
@@ -42,6 +43,12 @@ function createGameState() {
     selectedCardIndex: null,
     animating: false,
     log: [],
+    // PVP simultaneous resolution
+    pvpPending: {
+      player: { damage: 0, effects: [] },  // queued offensive actions by player 1
+      enemy: { damage: 0, effects: [] },   // queued offensive actions by player 2
+    },
+    pvpRoundLog: { player: [], enemy: [] }, // log messages per player for resolution screen
   };
 }
 
@@ -64,7 +71,16 @@ function startPVPGame(element1, element2) {
   gameState.enemy = createPVPOpponent(element2);
   gameState.phase = GAME_PHASES.BATTLE;
   gameState.currentTurn = 'player';
+  resetPvpPending();
   startTurn('player');
+}
+
+function resetPvpPending() {
+  gameState.pvpPending = {
+    player: { damage: 0, effects: [] },
+    enemy: { damage: 0, effects: [] },
+  };
+  gameState.pvpRoundLog = { player: [], enemy: [] };
 }
 
 function createPVPOpponent(element) {
@@ -82,8 +98,11 @@ function startTurn(who) {
   actor.block = 0;
   actor.energy = MAX_ENERGY;
 
-  // Apply start-of-turn status effects
-  applyStartOfTurnStatuses(actor, who);
+  // In AI mode, apply statuses at start of each turn
+  // In PVP, statuses are applied during resolution phase
+  if (gameState.mode === GAME_MODES.AI) {
+    applyStartOfTurnStatuses(actor, who);
+  }
 
   // Draw cards
   drawCards(actor, DRAW_COUNT);
@@ -149,36 +168,50 @@ function playCard(index) {
 
   const attacker = actor;
   const defender = getOpponent();
+  const isPVP = gameState.mode === GAME_MODES.PVP;
+  const who = gameState.currentTurn;
 
-  // Apply damage
+  // Calculate damage
   if (card.damage > 0) {
     let dmg = card.damage;
 
-    // Elemental strength bonus
     if (card.element && defender.element && ELEMENT_STRENGTH[card.element] === defender.element) {
       dmg = Math.floor(dmg * 1.5);
       addLog(`Elemental advantage! ${ELEMENT_ICONS[card.element]} > ${ELEMENT_ICONS[defender.element]}`);
     }
 
-    // Vulnerable check
-    const vuln = defender.statuses.find(s => s.type === 'vulnerable');
-    if (vuln) {
-      dmg = Math.floor(dmg * 1.5);
+    // Vulnerable only checked at resolution for PVP, immediately for AI
+    if (!isPVP) {
+      const vuln = defender.statuses.find(s => s.type === 'vulnerable');
+      if (vuln) dmg = Math.floor(dmg * 1.5);
     }
 
-    applyDamage(defender, dmg);
-    addLog(`${card.name} deals ${dmg} damage.`);
+    if (isPVP) {
+      gameState.pvpPending[who].damage += dmg;
+      gameState.pvpRoundLog[who].push(`${card.name} queues ${dmg} damage.`);
+      addLog(`${card.name} → ${dmg} damage (pending)`);
+    } else {
+      applyDamage(defender, dmg);
+      addLog(`${card.name} deals ${dmg} damage.`);
+    }
   }
 
-  // Apply block
+  // Block always applies immediately (self-targeting)
   if (card.block > 0) {
     attacker.block += card.block;
     addLog(`${card.name} grants ${card.block} Block.`);
   }
 
-  // Apply effects
+  // Apply effects — split by offensive vs self-targeting
   for (const effect of card.effects) {
-    applyEffect(effect, attacker, defender);
+    if (isPVP && isOffensiveEffect(effect)) {
+      gameState.pvpPending[who].effects.push({ ...effect });
+      const desc = describeEffect(effect);
+      gameState.pvpRoundLog[who].push(`${card.name} queues ${desc}.`);
+      addLog(`${card.name} → ${desc} (pending)`);
+    } else {
+      applyEffect(effect, attacker, defender);
+    }
   }
 
   // Remove card from hand, add to discard
@@ -186,13 +219,25 @@ function playCard(index) {
   actor.discard.push(card);
   gameState.selectedCardIndex = null;
 
-  // Check for death
-  if (defender.hp <= 0) {
+  // In AI mode, check for death immediately
+  if (!isPVP && defender.hp <= 0) {
     handleDeath();
     return;
   }
 
   renderGame();
+}
+
+function isOffensiveEffect(effect) {
+  return ['burn', 'vulnerable'].includes(effect.type);
+}
+
+function describeEffect(effect) {
+  switch (effect.type) {
+    case 'burn': return `${effect.value} Burn (${effect.duration}t)`;
+    case 'vulnerable': return `Vulnerable (${effect.duration}t)`;
+    default: return effect.type;
+  }
 }
 
 function applyDamage(target, amount) {
@@ -316,14 +361,15 @@ function endTurn() {
       startTurn('player');
     }
   } else {
-    // PVP mode
+    // PVP mode — simultaneous resolution
     if (gameState.currentTurn === 'player') {
+      // Player 1 done, pass to player 2
       gameState.phase = GAME_PHASES.PASS_DEVICE;
       gameState._nextTurn = 'enemy';
       renderGame();
     } else {
-      gameState.phase = GAME_PHASES.PASS_DEVICE;
-      gameState._nextTurn = 'player';
+      // Player 2 done — resolve both turns simultaneously
+      gameState.phase = GAME_PHASES.PVP_RESOLVE;
       renderGame();
     }
   }
@@ -333,6 +379,84 @@ function confirmPassDevice() {
   const next = gameState._nextTurn;
   gameState.phase = GAME_PHASES.BATTLE;
   startTurn(next);
+}
+
+function resolvePvpRound() {
+  const p1pending = gameState.pvpPending.player;
+  const p2pending = gameState.pvpPending.enemy;
+  const p1 = gameState.player;
+  const p2 = gameState.enemy;
+  const resolveLog = [];
+
+  // Apply player 1's offensive effects to player 2
+  if (p1pending.damage > 0) {
+    let dmg = p1pending.damage;
+    const vuln = p2.statuses.find(s => s.type === 'vulnerable');
+    if (vuln) dmg = Math.floor(dmg * 1.5);
+    applyDamage(p2, dmg);
+    resolveLog.push(`Player 1 deals ${dmg} damage to Player 2.`);
+  }
+  for (const effect of p1pending.effects) {
+    applyEffect(effect, p1, p2);
+    resolveLog.push(`Player 1 applies ${describeEffect(effect)} to Player 2.`);
+  }
+
+  // Apply player 2's offensive effects to player 1
+  if (p2pending.damage > 0) {
+    let dmg = p2pending.damage;
+    const vuln = p1.statuses.find(s => s.type === 'vulnerable');
+    if (vuln) dmg = Math.floor(dmg * 1.5);
+    applyDamage(p1, dmg);
+    resolveLog.push(`Player 2 deals ${dmg} damage to Player 1.`);
+  }
+  for (const effect of p2pending.effects) {
+    applyEffect(effect, p2, p1);
+    resolveLog.push(`Player 2 applies ${describeEffect(effect)} to Player 1.`);
+  }
+
+  // Store resolve log for display
+  gameState._resolveLog = resolveLog;
+
+  // Check for death — both can die (draw)
+  if (p1.hp <= 0 && p2.hp <= 0) {
+    gameState.phase = GAME_PHASES.GAME_OVER;
+    gameState._winner = 'Draw';
+    renderGame();
+    return;
+  }
+  if (p1.hp <= 0 || p2.hp <= 0) {
+    gameState.phase = GAME_PHASES.GAME_OVER;
+    gameState._winner = p2.hp <= 0 ? 'Player 1' : 'Player 2';
+    renderGame();
+    return;
+  }
+
+  // Both alive — start new round
+  resetPvpPending();
+  // Apply burn at start of new round for both players
+  applyStartOfTurnStatuses(p1, 'player');
+  applyStartOfTurnStatuses(p2, 'enemy');
+
+  // Check again after burn
+  if (p1.hp <= 0 || p2.hp <= 0) {
+    gameState.phase = GAME_PHASES.GAME_OVER;
+    if (p1.hp <= 0 && p2.hp <= 0) {
+      gameState._winner = 'Draw';
+    } else {
+      gameState._winner = p2.hp <= 0 ? 'Player 1' : 'Player 2';
+    }
+    renderGame();
+    return;
+  }
+
+  gameState.phase = GAME_PHASES.PASS_DEVICE;
+  gameState._nextTurn = 'player';
+  renderGame();
+}
+
+function startPvpNewRound() {
+  gameState.phase = GAME_PHASES.BATTLE;
+  startTurn('player');
 }
 
 function getCurrentActor() {

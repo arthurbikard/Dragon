@@ -18,6 +18,9 @@ function renderGame() {
     case GAME_PHASES.PASS_DEVICE:
       app.innerHTML = renderPassDevice();
       break;
+    case GAME_PHASES.PVP_RESOLVE:
+      app.innerHTML = renderPvpResolve();
+      break;
     case GAME_PHASES.GAME_OVER:
       app.innerHTML = renderGameOver();
       break;
@@ -388,11 +391,40 @@ function renderPassDevice() {
   `;
 }
 
+// === PVP RESOLVE ===
+function renderPvpResolve() {
+  const p1 = gameState.pvpPending.player;
+  const p2 = gameState.pvpPending.enemy;
+
+  return `
+    <div class="screen resolve-screen">
+      <h2 class="resolve-title">Round Resolve</h2>
+      <div class="resolve-columns">
+        <div class="resolve-col">
+          <div class="resolve-col-header">Player 1</div>
+          <div class="resolve-stat">${p1.damage > 0 ? `<span class="card-badge badge-damage">⚔ ${p1.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
+          ${p1.effects.map(e => `<div class="resolve-stat"><span class="card-badge badge-${e.type}">${describeEffect(e)}</span></div>`).join('')}
+        </div>
+        <div class="resolve-vs">VS</div>
+        <div class="resolve-col">
+          <div class="resolve-col-header">Player 2</div>
+          <div class="resolve-stat">${p2.damage > 0 ? `<span class="card-badge badge-damage">⚔ ${p2.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
+          ${p2.effects.map(e => `<div class="resolve-stat"><span class="card-badge badge-${e.type}">${describeEffect(e)}</span></div>`).join('')}
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="resolvePvpRound()">Resolve</button>
+    </div>
+  `;
+}
+
 // === GAME OVER ===
 function renderGameOver() {
-  const msg = gameState.mode === GAME_MODES.PVP
-    ? `${gameState._winner} wins`
-    : 'Defeated';
+  let msg;
+  if (gameState.mode === GAME_MODES.PVP) {
+    msg = gameState._winner === 'Draw' ? 'Draw!' : `${gameState._winner} wins`;
+  } else {
+    msg = 'Defeated';
+  }
 
   return `
     <div class="screen gameover-screen" style="background-image: url('images/defeat.png')">
