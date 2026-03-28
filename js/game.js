@@ -109,10 +109,10 @@ function returnToMap() {
   gameState.phase = GAME_PHASES.MAP;
   gameState.selectedCardIndex = null;
   renderGame();
-  // After render, draw paths and scroll to player
   requestAnimationFrame(() => {
     renderWorldPaths();
     scrollToCurrentLocation();
+    initDragListeners();
   });
 }
 

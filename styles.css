@@ -1236,6 +1236,29 @@ html, body {
 .map-deck { color: var(--parchment); }
 .map-hp { color: var(--hp-green); }
 
+.map-debug-btn {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  background: rgba(212, 160, 56, 0.2);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.map-debug-coords {
+  width: 100%;
+  text-align: center;
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: var(--gold);
+  background: rgba(0,0,0,0.8);
+  padding: 4px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
 /* Scrollable viewport */
 .world-viewport {
   flex: 1;

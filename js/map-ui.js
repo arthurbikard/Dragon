@@ -2,6 +2,9 @@
 
 // === WORLD MAP SCREEN ===
 
+// Debug mode: set to true to enable draggable nodes
+const MAP_DEBUG = true;
+
 function renderMap() {
   const campaign = gameState.campaign;
   const currentLoc = WORLD.locations[campaign.currentLocation];
@@ -13,6 +16,7 @@ function renderMap() {
         <span class="map-gold">💰 ${campaign.gold}</span>
         <span class="map-deck">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
         <span class="map-hp">❤️ ${gameState.player.hp}/${gameState.player.maxHp}</span>
+        ${MAP_DEBUG ? '<button class="map-debug-btn" onclick="exportNodePositions()">📋 Export</button>' : ''}
       </div>
       <div class="world-viewport" id="worldViewport">
         <div class="world-canvas" id="worldCanvas">
@@ -21,11 +25,99 @@ function renderMap() {
           ${renderPlayerMarker()}
         </div>
       </div>
+      ${MAP_DEBUG ? '<div class="map-debug-coords" id="debugCoords">Drag nodes to position them</div>' : ''}
       <div class="map-location-panel">
         ${renderLocationPanel()}
       </div>
     </div>
   `;
+}
+
+// === DEBUG: Draggable nodes ===
+let _dragTarget = null;
+let _dragOffset = { x: 0, y: 0 };
+
+function initDragListeners() {
+  if (!MAP_DEBUG) return;
+  const canvas = document.getElementById('worldCanvas');
+  if (!canvas) return;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    const node = e.target.closest('.world-location');
+    if (!node) return;
+    e.preventDefault();
+    _dragTarget = node;
+    const rect = node.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    _dragOffset.x = e.clientX - rect.left - rect.width / 2;
+    _dragOffset.y = e.clientY - rect.top - rect.height / 2;
+    node.style.zIndex = '100';
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!_dragTarget) return;
+    e.preventDefault();
+    const canvas = document.getElementById('worldCanvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    const viewport = document.getElementById('worldViewport');
+
+    const x = e.clientX - canvasRect.left - _dragOffset.x;
+    const y = e.clientY - canvasRect.top - _dragOffset.y;
+
+    _dragTarget.style.left = x + 'px';
+    _dragTarget.style.top = y + 'px';
+
+    // Show coordinates
+    const locId = _dragTarget.dataset.locId;
+    const gridX = (x / TILE_SIZE).toFixed(1);
+    const gridY = (y / TILE_SIZE).toFixed(1);
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) {
+      debugEl.textContent = `${locId}: x=${gridX}, y=${gridY}`;
+    }
+  });
+
+  canvas.addEventListener('pointerup', () => {
+    if (_dragTarget) {
+      _dragTarget.style.zIndex = '';
+      _dragTarget = null;
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => {
+    if (_dragTarget) {
+      _dragTarget.style.zIndex = '';
+      _dragTarget = null;
+    }
+  });
+}
+
+function exportNodePositions() {
+  const canvas = document.getElementById('worldCanvas');
+  if (!canvas) return;
+  const nodes = canvas.querySelectorAll('.world-location');
+  const positions = {};
+
+  nodes.forEach(node => {
+    const locId = node.dataset.locId;
+    const left = parseFloat(node.style.left) || 0;
+    const top = parseFloat(node.style.top) || 0;
+    positions[locId] = {
+      x: parseFloat((left / TILE_SIZE).toFixed(1)),
+      y: parseFloat((top / TILE_SIZE).toFixed(1)),
+    };
+  });
+
+  const text = Object.entries(positions)
+    .map(([id, pos]) => `${id}: x=${pos.x}, y=${pos.y}`)
+    .join('\n');
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Positions copied to clipboard!\n\n' + text);
+  }).catch(() => {
+    alert('Positions:\n\n' + text);
+  });
 }
 
 function renderWorldLocations() {
@@ -215,10 +307,10 @@ function onLocationTap(locId) {
 function doTravel(locId) {
   if (!travelTo(locId)) return;
   renderGame();
-  // After render, scroll to new position and draw paths
   requestAnimationFrame(() => {
     renderWorldPaths();
     scrollToCurrentLocation();
+    initDragListeners();
   });
 }
 
