@@ -192,26 +192,28 @@ function renderBattlefield(p, canAct) {
 
   return `
     <div class="battlefield">
-      <div class="bf-player">
-        <div class="bf-player-icon" style="background: ${ELEMENT_COLORS[p.element].bg}">
-          ${ELEMENT_ICONS[p.element]}
-        </div>
-        <div class="bf-player-info">
+      <div class="bf-row">
+        <div class="bf-player">
+          <div class="bf-player-icon" style="background: ${ELEMENT_COLORS[p.element].bg}">
+            ${ELEMENT_ICONS[p.element]}
+          </div>
           <div class="bf-player-header">
             <span class="combatant-name">${label}</span>
             ${renderStatuses(p)}
             ${p.block > 0 ? `<span class="block-badge">🛡 ${p.block}</span>` : ''}
-            ${battleNum}
-          </div>
-          <div class="hp-bar-container">
-            <div class="hp-bar hp-bar-player" style="width: ${hpPercent}%"></div>
-            <span class="hp-text">${p.hp} / ${p.maxHp}</span>
           </div>
         </div>
+        ${battleNum}
+        <div class="energy-display">
+          ${renderEnergy(canAct ? getCurrentActor().energy : 0)}
+        </div>
       </div>
-      <div class="bf-feed">${logHtml}</div>
-      <div class="energy-display">
-        ${renderEnergy(canAct ? getCurrentActor().energy : 0)}
+      <div class="bf-row">
+        <div class="hp-bar-container">
+          <div class="hp-bar hp-bar-player" style="width: ${hpPercent}%"></div>
+          <span class="hp-text">${p.hp} / ${p.maxHp}</span>
+        </div>
+        <div class="bf-feed">${logHtml}</div>
       </div>
     </div>
   `;
@@ -291,12 +293,13 @@ function renderCardBadges(card) {
 
 function renderCard(card, index, canAct) {
   const selected = gameState.selectedCardIndex === index;
-  const affordable = canAct && card.cost <= getCurrentActor().energy;
+  const inHand = index >= 0 && canAct;
+  const affordable = !inHand || card.cost <= getCurrentActor().energy;
   const elementColor = card.element ? ELEMENT_COLORS[card.element] : { primary: '#6b7280', secondary: '#9ca3af', bg: 'linear-gradient(135deg, #6b7280, #9ca3af)' };
 
   return `
     <div class="card ${selected ? 'card-selected' : ''} ${!affordable ? 'card-unaffordable' : ''} card-${card.type}"
-         onclick="${canAct ? `selectCard(${index})` : ''}">
+         onclick="${inHand ? `selectCard(${index})` : ''}">
       <div class="card-art" style="${card.image ? `background-image: url('${card.image}')` : `background: ${elementColor.bg}`}">
         ${card.image ? '' : `<span class="card-art-icon">${card.element ? ELEMENT_ICONS[card.element] : '🐉'}</span>`}
       </div>

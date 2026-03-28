@@ -582,14 +582,20 @@ html, body {
 .battlefield {
   width: 100%;
   display: flex;
-  align-items: stretch;
-  gap: 8px;
-  padding: 6px 10px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 4px;
   flex-shrink: 0;
-  animation: fadeIn 0.3s ease 0.15s both;
 }
 
-/* Player icon + info */
+.bf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Player icon + name */
 .bf-player {
   display: flex;
   align-items: center;
@@ -599,30 +605,21 @@ html, body {
 }
 
 .bf-player-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   flex-shrink: 0;
   border: 1.5px solid rgba(255,255,255,0.15);
-}
-
-.bf-player-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
 }
 
 .bf-player-header {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-wrap: wrap;
 }
 
 .bf-battle-num {
@@ -631,42 +628,37 @@ html, body {
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--smoke);
-  margin-left: auto;
 }
 
-/* Combat feed — centered in the battlefield */
+/* Combat feed */
 .bf-feed {
-  flex: 0 0 auto;
-  max-width: 140px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
   gap: 1px;
-  padding: 0 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .bf-feed .log-entry {
   font-family: var(--font-body);
   font-style: italic;
   font-size: 0.6rem;
-  color: rgba(212, 208, 200, 0.65);
+  color: rgba(212, 208, 200, 0.55);
   line-height: 1.3;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
-  animation: fadeIn 0.3s ease both;
+  max-width: 100%;
   padding: 0;
   background: none;
   border: none;
-  border-left: none;
   backdrop-filter: none;
 }
 
 .bf-feed .log-empty {
-  color: rgba(136, 136, 170, 0.35);
+  color: rgba(136, 136, 170, 0.3);
 }
 
 /* Energy orbs */
@@ -708,16 +700,16 @@ html, body {
 }
 
 /* ==============================
-   CARDS IN HAND — flex to fit
+   CARDS IN HAND — 2-row grid
    ============================== */
 .hand {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: 5px;
-  padding: 0 6px 2px;
+  padding: 4px 6px 2px;
   width: 100%;
   flex: 1;
-  align-items: flex-end;
-  justify-content: center;
+  align-content: end;
   overflow: hidden;
 }
 
@@ -727,26 +719,22 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
-  width: 100%;
+  grid-column: 1 / -1;
 }
 
 /* ==============================
    CARD — Art-dominant design
    The art IS the card. Info overlays.
-   Cards shrink to always fit on screen.
    ============================== */
 .card {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 130px;
-  aspect-ratio: 2.5 / 3.8;
-  border-radius: 8px;
+  width: 100%;
+  aspect-ratio: 2.5 / 3.5;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
   position: relative;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s, flex 0.25s;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s;
   border: 1.5px solid rgba(255,255,255,0.08);
 }
 
@@ -1074,10 +1062,13 @@ html, body {
 
 .reward-card:active { transform: scale(0.95); }
 
+.reward-card {
+  width: 110px;
+  flex-shrink: 0;
+}
+
 .reward-card .card {
-  flex: 0 0 110px;
-  max-width: 110px;
-  aspect-ratio: 2.5 / 3.8;
+  width: 100%;
   opacity: 1;
   pointer-events: none;
 }
@@ -1179,7 +1170,7 @@ html, body {
 @media (min-width: 481px) {
   .card { max-width: 145px; }
   .enemy-banner { height: 180px; }
-  .reward-card .card { max-width: 130px; }
+  .reward-card { width: 130px; }
 }
 
 @media (max-height: 700px) {

@@ -121,8 +121,22 @@ function selectCard(index) {
     // Tap again = play the card
     playCard(index);
   } else {
+    // Update selection without full re-render to avoid blink
+    const prevIndex = gameState.selectedCardIndex;
     gameState.selectedCardIndex = index;
-    renderGame();
+
+    const hand = document.querySelector('.hand');
+    if (hand) {
+      const cards = hand.querySelectorAll('.card');
+      if (prevIndex !== null && cards[prevIndex]) {
+        cards[prevIndex].classList.remove('card-selected');
+      }
+      if (cards[index]) {
+        cards[index].classList.add('card-selected');
+      }
+    } else {
+      renderGame();
+    }
   }
 }
 
