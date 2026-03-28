@@ -369,29 +369,7 @@ function handleDeath() {
   }
 }
 
-function pickRewardCard(index) {
-  const card = gameState._rewardCards[index];
-  if (!card) return;
-  addLog(`Added ${card.name} to deck!`);
-
-  // Consolidate all cards back into deck, plus the new reward card
-  gameState.player.deck = shuffleArray([
-    ...gameState.player.deck,
-    ...gameState.player.discard,
-    ...gameState.player.hand,
-    card,
-  ]);
-  gameState.player.discard = [];
-  gameState.player.hand = [];
-
-  // Next battle
-  gameState.battleIndex++;
-  setupAIBattle(gameState.battleIndex);
-  gameState.phase = GAME_PHASES.BATTLE;
-  startTurn('player');
-}
-
-function skipReward() {
+function prepareNextBattle() {
   // Consolidate all cards back into deck
   gameState.player.deck = shuffleArray([
     ...gameState.player.deck,
@@ -400,6 +378,27 @@ function skipReward() {
   ]);
   gameState.player.discard = [];
   gameState.player.hand = [];
+
+  // Clear statuses and block, but KEEP current HP
+  gameState.player.block = 0;
+  gameState.player.statuses = [];
+
+  gameState.battleIndex++;
+  setupAIBattle(gameState.battleIndex);
+  gameState.phase = GAME_PHASES.BATTLE;
+  startTurn('player');
+}
+
+function pickRewardCard(index) {
+  const card = gameState._rewardCards[index];
+  if (!card) return;
+  addLog(`Added ${card.name} to deck!`);
+  gameState.player.deck.push(card);
+  prepareNextBattle();
+}
+
+function skipReward() {
+  prepareNextBattle();
 
   // Next battle
   gameState.battleIndex++;
