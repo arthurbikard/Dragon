@@ -279,6 +279,44 @@ html, body {
   animation: fadeUp 0.8s ease 0.3s both;
 }
 
+.version-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+  animation: fadeIn 1s ease 0.6s both;
+}
+
+.version-text {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--smoke);
+  opacity: 0.5;
+}
+
+.version-reload {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--smoke);
+  opacity: 0.5;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.version-reload:active {
+  opacity: 0.8;
+}
+
 /* ==============================
    ELEMENT SELECT
    ============================== */

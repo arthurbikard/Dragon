@@ -42,9 +42,20 @@ function renderMenu() {
             Local Duel
           </button>
         </div>
+        <div class="version-bar">
+          <span class="version-text">v${GAME_VERSION}</span>
+          <button class="version-reload" onclick="hardReload()">↻ Update</button>
+        </div>
       </div>
     </div>
   `;
+}
+
+function hardReload() {
+  if ('caches' in window) {
+    caches.keys().then(names => names.forEach(name => caches.delete(name)));
+  }
+  window.location.reload(true);
 }
 
 function startModeSelect(mode) {
