@@ -155,6 +155,9 @@ function renderLocationPanel() {
         break;
       case LOC_TYPES.NPC:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Talk</button>`;
+        if (loc.hasShop) {
+          actions += `<button class="btn btn-secondary" onclick="openVillageShop()">Shop</button>`;
+        }
         break;
       case LOC_TYPES.TREASURE:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Open</button>`;
@@ -171,6 +174,9 @@ function renderLocationPanel() {
     }
     if (loc.type === LOC_TYPES.NPC) {
       actions += ` <button class="btn btn-secondary" onclick="enterLocation()">Talk Again</button>`;
+      if (loc.hasShop) {
+        actions += ` <button class="btn btn-secondary" onclick="openVillageShop()">Shop</button>`;
+      }
     }
   }
 
@@ -451,6 +457,12 @@ function openCardRemove() { openShopRemove(); }
 function leaveShop() {
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
+}
+
+function openVillageShop() {
+  gameState._shopCards = getAvailableShopCards();
+  gameState.phase = GAME_PHASES.SHOP;
+  renderGame();
 }
 
 // === EVENTS ===
