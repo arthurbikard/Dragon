@@ -622,6 +622,14 @@ function simulateGame(agent, element, ablation) {
           continue;
         }
 
+        // Remove filler cards if affordable
+        const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+        const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+        if (hasFiller && gold >= CARD_REMOVE_PRICE) {
+          openShopRemove();
+          continue;
+        }
+
         // Try to buy a card
         const items = gameState._shopCards || [];
         const pick = agent.pickShopCard(items, gold);
@@ -650,13 +658,13 @@ function simulateGame(agent, element, ablation) {
 
         if (hpRatio < 0.5) {
           doRest(); // heal when low
+        } else if (deckSize > 10 && hpRatio > 0.5) {
+          // Remove weakest card if deck has filler
+          gameState._upgradeMode = 'remove';
+          gameState.phase = GAME_PHASES.CARD_UPGRADE;
         } else if (hasUpgradeable && hpRatio > 0.7) {
           // Upgrade best card when healthy
           gameState._upgradeMode = 'upgrade';
-          gameState.phase = GAME_PHASES.CARD_UPGRADE;
-        } else if (deckSize > 12 && hpRatio > 0.6) {
-          // Remove weakest card if deck is bloated
-          gameState._upgradeMode = 'remove';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
         } else {
           doRest();
@@ -782,10 +790,18 @@ function simulateMapTurn(agent, stats) {
           return;
         }
         const hpRatio = gameState.player.hp / gameState.player.maxHp;
-        if (hpRatio < 0.7) {
+        const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+        const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+        if (hpRatio < 0.5) {
+          doRest(); // heal when critically low
+        } else if (hasFiller) {
+          // Remove filler cards first — deck quality > upgrades
+          gameState._upgradeMode = 'remove';
+          gameState.phase = GAME_PHASES.CARD_UPGRADE;
+        } else if (hpRatio < 0.7) {
           doRest();
         } else {
-          const hasUpgradeable = gameState.player.deck.some(c => !c.upgraded);
+          const hasUpgradeable = allCards.some(c => !c.upgraded);
           if (hasUpgradeable) {
             gameState._upgradeMode = 'upgrade';
             gameState.phase = GAME_PHASES.CARD_UPGRADE;
