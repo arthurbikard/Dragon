@@ -124,15 +124,15 @@ const AI_ENEMIES = [
     id: 'storm_drake',
     name: 'Storm Drake',
     element: ELEMENTS.AIR,
-    hp: 90,
-    maxHp: 90,
+    hp: 110,
+    maxHp: 110,
     image: 'images/enemy_ember_titan.png',
     // Mini-boss — brutal. Requires upgraded cards, good deck, near-full HP.
     // Strength stacking means long fights get progressively harder.
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 14, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 24, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 12, weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 15, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 26, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 13, weight: 2 },
       { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 3 }], weight: 2 },
     ],
   },
