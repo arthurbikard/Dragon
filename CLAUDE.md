@@ -66,9 +66,13 @@ gameState.campaign = {
 
 ## Development Practices
 
+### Git Workflow
+- **Do not push after every commit.** Batch commits and only push when the user explicitly asks.
+- A pre-commit hook auto-bumps the patch version in `index.html` on each commit.
+
 ### Version System
 - Version in `index.html` as `GAME_VERSION` constant and `?v=X.Y.Z` query strings on all assets
-- Bump version on every push to bust browser cache
+- Version is auto-bumped by the pre-commit git hook
 - Menu screen shows version + "Update" button for hard reload
 
 ### Balance Testing
