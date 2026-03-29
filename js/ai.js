@@ -20,13 +20,13 @@ const AI_ENEMIES = [
     id: 'young_drake',
     name: 'Young Drake',
     element: ELEMENTS.FIRE,
-    hp: 38,
-    maxHp: 38,
+    hp: 45,
+    maxHp: 45,
     image: 'images/enemy_young_drake.png',
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
-      { type: INTENT_TYPES.DEFEND, block: 5, weight: 2 },
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 9, weight: 3 },
+      { type: INTENT_TYPES.DEFEND, block: 6, weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 13, weight: 1 },
     ],
   },
   {
@@ -109,29 +109,31 @@ const AI_ENEMIES = [
     id: 'coastal_serpent',
     name: 'Coastal Serpent',
     element: ELEMENTS.WATER,
-    hp: 50,
-    maxHp: 50,
+    hp: 58,
+    maxHp: 58,
     image: 'images/enemy_storm_wyrm.png',
-    // Elite coast enemy — fast and hits hard
+    // Elite — hits hard and blocks. Needs a built deck to beat.
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 16, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 8, weight: 2 },
+      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 20, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 1 },
     ],
   },
   {
     id: 'storm_drake',
     name: 'Storm Drake',
     element: ELEMENTS.AIR,
-    hp: 60,
-    maxHp: 60,
+    hp: 90,
+    maxHp: 90,
     image: 'images/enemy_ember_titan.png',
-    // Mini-boss — mixes everything, tests your deck
+    // Mini-boss — brutal. Requires upgraded cards, good deck, near-full HP.
+    // Strength stacking means long fights get progressively harder.
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 10, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 1 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 14, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 24, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 12, weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 2 },
     ],
   },
 
