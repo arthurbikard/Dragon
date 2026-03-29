@@ -24,8 +24,8 @@ function renderMap() {
           ${renderPlayerMarker()}
         </div>
       </div>
-      ${MAP_DEBUG ? '<div class="map-debug-coords" id="debugCoords">Drag nodes to position them</div>' : ''}
-      <div class="map-debug-coords" id="debugState" style="font-size:0.5rem;max-height:60px;overflow:auto">${renderDebugState()}</div>
+      ${MAP_DEBUG ? `<div class="map-debug-coords" id="debugCoords">Drag nodes to position them</div>
+      <div class="map-debug-coords" id="debugState" style="font-size:0.5rem;max-height:60px;overflow:auto">${renderDebugState()}</div>` : ''}
       <div class="map-location-panel">
         ${renderLocationPanel()}
       </div>
