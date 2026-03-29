@@ -220,7 +220,7 @@ const RARE_CARD_TEMPLATES = {
     cost: 1, damage: 0, block: 0,
     effects: [{ type: 'burn', value: 5, duration: 4 }, { type: 'gainEnergy', value: 1 }],
     description: 'Apply 5 Burn for 4 turns. Gain 1 Energy. A flame that never dies.',
-    image: 'images/card_inferno.png', rarity: 'legendary',
+    image: 'images/card_lighthouse_flame.png', rarity: 'legendary',
   },
 };
 
