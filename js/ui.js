@@ -478,6 +478,8 @@ function renderVictory() {
 
 // === FLOATING NOTIFICATIONS ===
 
+let _notificationQueue = 0;
+
 function showNotification(text, type) {
   // type: 'heal', 'damage', 'gold', 'card', 'info'
   const colors = {
@@ -487,12 +489,18 @@ function showNotification(text, type) {
     card: '#a78bfa',
     info: '#e2d1b5',
   };
-  const el = document.createElement('div');
-  el.className = 'float-notification';
-  el.style.color = colors[type] || colors.info;
-  el.textContent = text;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1800);
+  const delay = _notificationQueue * 600;
+  _notificationQueue++;
+
+  setTimeout(() => {
+    const el = document.createElement('div');
+    el.className = 'float-notification';
+    el.style.color = colors[type] || colors.info;
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+    _notificationQueue = Math.max(0, _notificationQueue - 1);
+  }, delay);
 }
 
 // Initialize
