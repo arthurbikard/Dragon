@@ -13,7 +13,7 @@ function renderMap() {
     <div class="screen map-screen">
       <div class="map-topbar">
         <span class="map-gold">💰 ${campaign.gold}</span>
-        <span class="map-deck">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
+        <span class="map-deck" onclick="openDeckViewer()" style="cursor:pointer">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
         <span class="map-hp">❤️ ${gameState.player.hp}/${gameState.player.maxHp}</span>
         ${MAP_DEBUG ? '<button class="map-debug-btn" onclick="exportNodePositions()">📋 Export</button>' : ''}
       </div>
@@ -515,6 +515,39 @@ function openRemoveSelect() {
   gameState._upgradeMode = 'remove';
   gameState.phase = GAME_PHASES.CARD_UPGRADE;
   renderGame();
+}
+
+// === DECK VIEWER ===
+
+function openDeckViewer() {
+  const allCards = [...gameState.player.deck, ...gameState.player.hand, ...gameState.player.discard];
+  // Sort by cost, then name
+  allCards.sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+
+  const overlay = document.createElement('div');
+  overlay.className = 'deck-viewer-overlay';
+  overlay.id = 'deckViewer';
+  overlay.innerHTML = `
+    <div class="deck-viewer">
+      <div class="deck-viewer-header">
+        <h2 class="screen-title">Your Deck (${allCards.length})</h2>
+        <button class="btn btn-secondary" onclick="closeDeckViewer()">Close</button>
+      </div>
+      <div class="deck-viewer-cards">
+        ${allCards.map(card => `
+          <div class="deck-viewer-card">
+            ${renderCard(card, -1, false)}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  document.getElementById('app').appendChild(overlay);
+}
+
+function closeDeckViewer() {
+  const el = document.getElementById('deckViewer');
+  if (el) el.remove();
 }
 
 // === CARD UPGRADE / REMOVE ===

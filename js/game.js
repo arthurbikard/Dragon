@@ -116,6 +116,16 @@ function setupAIBattleByEnemy(enemyId) {
 function returnToMap() {
   gameState.phase = GAME_PHASES.MAP;
   gameState.selectedCardIndex = null;
+  // Consolidate all cards back into deck (hand may have leftovers from battle)
+  if (gameState.player) {
+    gameState.player.deck = [
+      ...gameState.player.deck,
+      ...gameState.player.hand,
+      ...gameState.player.discard,
+    ];
+    gameState.player.hand = [];
+    gameState.player.discard = [];
+  }
   renderGame();
   requestAnimationFrame(() => {
     renderWorldPaths();

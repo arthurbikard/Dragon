@@ -1245,8 +1245,52 @@ html, body {
 }
 
 .map-gold { color: var(--gold); }
-.map-deck { color: var(--parchment); }
+.map-deck { color: var(--parchment); text-decoration: underline; text-underline-offset: 2px; }
 .map-hp { color: var(--hp-green); }
+
+/* Deck Viewer */
+.deck-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(8, 8, 16, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.deck-viewer {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.deck-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.deck-viewer-header .btn { padding: 6px 14px; font-size: 0.65rem; }
+
+.deck-viewer-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  flex: 1;
+}
+
+.deck-viewer-cards::-webkit-scrollbar { display: none; }
+
+.deck-viewer-card .card { pointer-events: none; }
 
 .map-debug-btn {
   font-family: var(--font-display);
