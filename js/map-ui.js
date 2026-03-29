@@ -556,7 +556,7 @@ function renderCardUpgrade() {
   const mode = gameState._upgradeMode || 'upgrade';
   const title = mode === 'remove' ? 'Remove a Card' : 'Upgrade a Card';
   const hint = mode === 'remove' ? 'Select a card to remove' : 'Select a card to upgrade';
-  const allCards = [...gameState.player.deck, ...gameState.player.discard];
+  const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
   const cards = mode === 'upgrade' ? allCards.filter(c => !c.upgraded) : allCards;
 
   return `
