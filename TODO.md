@@ -1,6 +1,6 @@
 # Dragon Cards — TODO
 
-## Current Version: v0.8.0
+## Current Version: v0.8.1
 
 ## Priorities
 
