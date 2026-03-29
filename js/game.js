@@ -661,5 +661,44 @@ function addLog(msg) {
 
 function returnToMenu() {
   gameState = createGameState();
+  localStorage.removeItem('dragonSave');
   renderGame();
+}
+
+// === SAVE / RESTORE ===
+
+function saveGame() {
+  // Only save during an active campaign (not menu, not mid-battle)
+  if (!gameState.mode || !gameState.campaign) return;
+  // Don't save during battle — resume from map
+  if (gameState.phase === GAME_PHASES.BATTLE) return;
+
+  const save = JSON.parse(JSON.stringify(gameState, (key, value) => {
+    if (value instanceof Set) return { __set: [...value] };
+    return value;
+  }));
+  try {
+    localStorage.setItem('dragonSave', JSON.stringify(save));
+  } catch (e) { /* storage full — ignore */ }
+}
+
+function restoreGame() {
+  try {
+    const raw = localStorage.getItem('dragonSave');
+    if (!raw) return false;
+    const save = JSON.parse(raw, (key, value) => {
+      if (value && value.__set) return new Set(value.__set);
+      return value;
+    });
+    // Basic validation
+    if (!save.mode || !save.player || !save.campaign) return false;
+    gameState = save;
+    // If we were in a transient phase, return to map
+    if (![GAME_PHASES.MAP, GAME_PHASES.SHOP, GAME_PHASES.REST, GAME_PHASES.NPC, GAME_PHASES.EVENT].includes(gameState.phase)) {
+      gameState.phase = GAME_PHASES.MAP;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }

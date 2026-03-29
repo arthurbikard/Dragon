@@ -46,6 +46,12 @@ function renderGame() {
       app.innerHTML = renderVictory();
       break;
   }
+  // Clear save on game end, auto-save otherwise
+  if (gameState.phase === GAME_PHASES.GAME_OVER || gameState.phase === GAME_PHASES.VICTORY || gameState.phase === GAME_PHASES.MENU) {
+    localStorage.removeItem('dragonSave');
+  } else if (typeof saveGame === 'function') {
+    saveGame();
+  }
 }
 
 // === MENU ===
@@ -525,6 +531,23 @@ document.addEventListener('DOMContentLoaded', () => {
       gameState.phase = GAME_PHASES.SHOP;
     }
     renderGame();
+    return;
+  }
+  // Save when app goes to background
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && typeof saveGame === 'function') saveGame();
+  });
+
+  // Try to restore saved game
+  if (restoreGame()) {
+    renderGame();
+    if (gameState.phase === GAME_PHASES.MAP) {
+      requestAnimationFrame(() => {
+        renderWorldPaths();
+        scrollToCurrentLocation();
+        initDragListeners();
+      });
+    }
     return;
   }
   renderGame();
