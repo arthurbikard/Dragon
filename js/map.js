@@ -397,8 +397,9 @@ function getAvailableShopCards() {
   return [...regular, ...rare];
 }
 
+// Cards with rarity 'legendary' are excluded from random rare pools (only from special rewards)
 function getRareCard() {
-  const keys = Object.keys(RARE_CARD_TEMPLATES);
+  const keys = Object.keys(RARE_CARD_TEMPLATES).filter(k => RARE_CARD_TEMPLATES[k].rarity !== 'legendary');
   const key = keys[Math.floor(Math.random() * keys.length)];
   return getRareCardByKey(key);
 }
