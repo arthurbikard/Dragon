@@ -478,5 +478,27 @@ function renderVictory() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+  // Debug: ?phase=rest or ?phase=upgrade or ?phase=map to jump straight there
+  const debugPhase = new URLSearchParams(window.location.search).get('phase');
+  if (debugPhase) {
+    startAIGame('fire');
+    // Fight a couple battles worth of cards to make state realistic
+    if (debugPhase === 'upgrade' || debugPhase === 'card_upgrade') {
+      gameState._upgradeMode = 'upgrade';
+      gameState.phase = GAME_PHASES.CARD_UPGRADE;
+    } else if (debugPhase === 'remove') {
+      gameState._upgradeMode = 'remove';
+      gameState.phase = GAME_PHASES.CARD_UPGRADE;
+    } else if (debugPhase === 'rest') {
+      gameState.campaign.battlesSinceRest = REST_COOLDOWN_BATTLES;
+      gameState.phase = GAME_PHASES.REST;
+    } else if (debugPhase === 'shop') {
+      gameState.campaign.gold = 50;
+      gameState._shopCards = getAvailableShopCards();
+      gameState.phase = GAME_PHASES.SHOP;
+    }
+    renderGame();
+    return;
+  }
   renderGame();
 });
