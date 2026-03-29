@@ -239,6 +239,7 @@ function createCampaignState() {
     currentLocation: startId,
     gold: 0,
     blessings: {},
+    battlesSinceRest: REST_COOLDOWN_BATTLES, // start able to rest; resets to 0 after each rest
   };
 }
 
@@ -316,6 +317,32 @@ function getConnectedLocations() {
   return currentLoc.paths
     .filter(id => WORLD.locations[id])
     .map(id => ({ id, ...WORLD.locations[id] }));
+}
+
+const REST_COOLDOWN_BATTLES = 2; // must fight at least 2 battles between rests
+
+function canRest() {
+  return gameState.campaign.battlesSinceRest >= REST_COOLDOWN_BATTLES;
+}
+
+// Ambush: chance of random combat when traveling to non-combat locations
+const AMBUSH_CHANCE = 0.15; // 15% chance per travel
+
+function rollAmbush(locId) {
+  const loc = WORLD.locations[locId];
+  if (!loc) return null;
+  // No ambush on combat locations (already fighting), or start village, or first 2 locations visited
+  const isCombat = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type);
+  if (isCombat) return null;
+  if (gameState.campaign.visited.size <= 3) return null; // safe early game
+
+  if (Math.random() < AMBUSH_CHANCE) {
+    // Pick a random enemy from the biome's enemy pool
+    const biome = WORLD.biomes[loc.biome];
+    if (!biome || !biome.enemyPool || biome.enemyPool.length === 0) return null;
+    return biome.enemyPool[Math.floor(Math.random() * biome.enemyPool.length)];
+  }
+  return null;
 }
 
 function getLocationPixelPos(loc) {

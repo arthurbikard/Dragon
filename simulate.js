@@ -639,7 +639,7 @@ function simulateGame(agent, element, ablation) {
       }
 
       if (gameState.phase === GAME_PHASES.REST) {
-        if (abl === 'No resting') {
+        if (abl === 'No resting' || !canRest()) {
           clearLocation(gameState.campaign.currentLocation);
           returnToMap();
           continue;
@@ -776,6 +776,11 @@ function simulateMapTurn(agent, stats) {
       }
 
       if (type === LOC_TYPES.REST && _activeAblation !== 'No resting') {
+        if (!canRest()) {
+          // Can't rest yet — just clear and move on
+          clearLocation(currentId);
+          return;
+        }
         const hpRatio = gameState.player.hp / gameState.player.maxHp;
         if (hpRatio < 0.7) {
           doRest();
@@ -859,7 +864,8 @@ function pickDestination(agent, connections) {
     if (!cleared) score += 20;
     else score -= 10;
 
-    if (loc.type === LOC_TYPES.REST && hpRatio < 0.6) score += 15;
+    if (loc.type === LOC_TYPES.REST && hpRatio < 0.6 && canRest()) score += 15;
+    if (loc.type === LOC_TYPES.REST && !canRest()) score -= 5;
     if (loc.type === LOC_TYPES.SHOP && campaign.gold >= 8) score += 10;
     if (loc.type === LOC_TYPES.ELITE && hpRatio > 0.7) score += 12;
     if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.5) score -= 10;

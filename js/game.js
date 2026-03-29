@@ -551,6 +551,9 @@ function handleDeath() {
       const locId = gameState._battleLocationId;
       if (locId) clearLocation(locId);
 
+      // Track battles for rest cooldown
+      gameState.campaign.battlesSinceRest = (gameState.campaign.battlesSinceRest || 0) + 1;
+
       // Grant gold
       const goldReward = gameState._battleGoldReward || 0;
       if (goldReward > 0) {
@@ -570,6 +573,14 @@ function handleDeath() {
       if (loc && (loc.type === LOC_TYPES.BOSS || loc.type === LOC_TYPES.MINI_BOSS)) {
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
+        return;
+      }
+
+      // Ambush battles: no card reward, just return to map
+      if (gameState._isAmbush) {
+        gameState._isAmbush = false;
+        addLog('You survived the ambush!');
+        returnToMap();
         return;
       }
 

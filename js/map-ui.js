@@ -312,7 +312,13 @@ function renderLocationPanel() {
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Enter Shop</button>`;
         break;
       case LOC_TYPES.REST:
-        actions = `<button class="btn btn-primary" onclick="enterLocation()">Rest</button>`;
+        if (canRest()) {
+          actions = `<button class="btn btn-primary" onclick="enterLocation()">Rest</button>`;
+        } else {
+          const remaining = REST_COOLDOWN_BATTLES - (gameState.campaign.battlesSinceRest || 0);
+          actions = `<button class="btn btn-primary" disabled>Rest</button>
+            <span class="panel-blocked">Too soon — fight ${remaining} more battle${remaining !== 1 ? 's' : ''} first</span>`;
+        }
         break;
       case LOC_TYPES.EVENT:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Explore</button>`;
@@ -334,7 +340,13 @@ function renderLocationPanel() {
       actions += ` <button class="btn btn-secondary" onclick="enterLocation()">Shop Again</button>`;
     }
     if (loc.type === LOC_TYPES.REST) {
-      actions += ` <button class="btn btn-secondary" onclick="enterLocation()">Rest Again</button>`;
+      if (canRest()) {
+        actions += ` <button class="btn btn-secondary" onclick="enterLocation()">Rest Again</button>`;
+      } else {
+        const remaining = REST_COOLDOWN_BATTLES - (gameState.campaign.battlesSinceRest || 0);
+        actions += ` <button class="btn btn-secondary" disabled>Rest Again</button>
+          <span class="panel-blocked">Fight ${remaining} more battle${remaining !== 1 ? 's' : ''} first</span>`;
+      }
     }
     if (loc.type === LOC_TYPES.NPC) {
       actions += ` <button class="btn btn-secondary" onclick="enterLocation()">Talk Again</button>`;
@@ -382,6 +394,20 @@ function onLocationTap(locId) {
 
 function doTravel(locId) {
   if (!travelTo(locId)) return;
+
+  // Check for ambush
+  const ambushEnemy = rollAmbush(locId);
+  if (ambushEnemy) {
+    gameState._battleLocationId = null; // ambush doesn't clear a location
+    gameState._battleGoldReward = 5; // small gold reward for surviving
+    gameState._battleIsElite = false;
+    gameState._isAmbush = true;
+    setupAIBattleByEnemy(ambushEnemy);
+    addLog(`Ambush! A ${gameState.enemy.name} attacks!`);
+    prepareBattle();
+    return;
+  }
+
   renderGame();
   requestAnimationFrame(() => {
     renderWorldPaths();
@@ -474,6 +500,7 @@ function doRest() {
   const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
   gameState.player.hp += healAmount;
   addLog(`Rested and healed ${healAmount} HP.`);
+  gameState.campaign.battlesSinceRest = 0; // reset rest cooldown
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
 }
