@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 // === Stub browser globals ===
-global.document = { addEventListener: () => {}, querySelector: () => null, getElementById: () => ({ innerHTML: '' }) };
+global.document = { addEventListener: () => {}, querySelector: () => null, getElementById: () => ({ innerHTML: '' }), createElement: () => ({ className: '', style: {}, textContent: '', remove() {} }), body: { appendChild() {} } };
 global.window = { addEventListener: () => {}, location: { reload: () => {} } };
 global.setTimeout = (fn) => fn(); // execute immediately
 global.requestAnimationFrame = (fn) => fn(); // execute immediately
@@ -23,6 +23,7 @@ global.GAME_VERSION = '0.0.0';
 
 // Stub renderGame so UI code doesn't crash
 global.renderGame = () => {};
+global.showNotification = () => {};
 
 // === Load game source files in order ===
 // Use vm.runInThisContext so top-level const/let become globals

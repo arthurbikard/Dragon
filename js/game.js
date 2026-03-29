@@ -569,6 +569,7 @@ function handleDeath() {
       if (goldReward > 0) {
         gameState.campaign.gold += goldReward;
         addLog(`Earned ${goldReward} gold.`);
+        if (typeof showNotification === 'function') showNotification(`+${goldReward} gold`, 'gold');
       }
 
       // Mini-boss: grant blessing
@@ -634,6 +635,7 @@ function skipReward() {
   if (healAmount > 0) {
     gameState.player.hp += healAmount;
     addLog(`Skipped reward. Healed ${healAmount} HP.`);
+    if (typeof showNotification === 'function') showNotification(`+${healAmount} HP`, 'heal');
   }
   advanceAfterNode();
 }

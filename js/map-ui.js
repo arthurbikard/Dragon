@@ -404,6 +404,7 @@ function doTravel(locId) {
     gameState._isAmbush = true;
     setupAIBattleByEnemy(ambushEnemy);
     addLog(`Ambush! A ${gameState.enemy.name} attacks!`);
+    showNotification('Ambush!', 'damage');
     prepareBattle();
     return;
   }
@@ -500,6 +501,7 @@ function doRest() {
   const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
   gameState.player.hp += healAmount;
   addLog(`Rested and healed ${healAmount} HP.`);
+  if (healAmount > 0) showNotification(`+${healAmount} HP`, 'heal');
   gameState.campaign.battlesSinceRest = 0; // reset rest cooldown
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
@@ -670,6 +672,7 @@ function buyHeal() {
   gameState.campaign.gold -= SHOP_HEAL_PRICE;
   gameState.player.hp += healed;
   addLog(`Healed ${healed} HP.`);
+  showNotification(`+${healed} HP`, 'heal');
   renderGame();
 }
 
@@ -727,9 +730,11 @@ function doEventChoice(index) {
     if (choice.cost.hp) {
       gameState.player.hp = Math.max(1, gameState.player.hp - choice.cost.hp);
       addLog(`Lost ${choice.cost.hp} HP.`);
+      showNotification(`-${choice.cost.hp} HP`, 'damage');
     }
     if (choice.cost.gold) {
       gameState.campaign.gold -= choice.cost.gold;
+      showNotification(`-${choice.cost.gold} gold`, 'gold');
     }
   }
 
@@ -737,12 +742,16 @@ function doEventChoice(index) {
     if (choice.reward.heal) {
       const healed = Math.min(choice.reward.heal, gameState.player.maxHp - gameState.player.hp);
       gameState.player.hp += healed;
-      if (healed > 0) addLog(`Healed ${healed} HP.`);
+      if (healed > 0) {
+        addLog(`Healed ${healed} HP.`);
+        showNotification(`+${healed} HP`, 'heal');
+      }
     }
     if (choice.reward.rareCard) {
       const card = getRareCard();
       gameState.player.deck.push(card);
       addLog(`Gained rare card: ${card.name}!`);
+      showNotification(`+ ${card.name}`, 'card');
     }
     if (choice.reward.removeCard) {
       gameState._upgradeMode = 'remove';

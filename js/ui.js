@@ -476,6 +476,25 @@ function renderVictory() {
   `;
 }
 
+// === FLOATING NOTIFICATIONS ===
+
+function showNotification(text, type) {
+  // type: 'heal', 'damage', 'gold', 'card', 'info'
+  const colors = {
+    heal: '#4ade80',
+    damage: '#ef4444',
+    gold: '#d4a038',
+    card: '#a78bfa',
+    info: '#e2d1b5',
+  };
+  const el = document.createElement('div');
+  el.className = 'float-notification';
+  el.style.color = colors[type] || colors.info;
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1800);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   // Debug: ?phase=rest or ?phase=upgrade or ?phase=map to jump straight there
