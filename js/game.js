@@ -579,12 +579,24 @@ function handleDeath() {
         gameState._miniBossBlessing = null;
       }
 
-      // Boss or mini-boss (if no further biomes) = victory
+      // Boss = victory. Mini-boss = victory only if no further locations require its blessing.
       const loc = locId ? WORLD.locations[locId] : null;
-      if (loc && (loc.type === LOC_TYPES.BOSS || loc.type === LOC_TYPES.MINI_BOSS)) {
+      if (loc && loc.type === LOC_TYPES.BOSS) {
         gameState.phase = GAME_PHASES.VICTORY;
         renderGame();
         return;
+      }
+      if (loc && loc.type === LOC_TYPES.MINI_BOSS) {
+        // Check if any location requires the blessing this mini-boss grants
+        const blessing = loc.blessing;
+        const hasNextBiome = blessing && Object.values(WORLD.locations).some(l => l.requiresBlessing === blessing);
+        if (!hasNextBiome) {
+          // Final mini-boss — victory
+          gameState.phase = GAME_PHASES.VICTORY;
+          renderGame();
+          return;
+        }
+        // Otherwise grant blessing and continue
       }
 
       // Ambush battles: no card reward, just return to map

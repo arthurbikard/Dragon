@@ -441,14 +441,28 @@ const AGENTS = {
     },
 
     pickEventChoice(choices) {
-      // Take risky choice only if HP is high enough
       const hpRatio = gameState.player.hp / gameState.player.maxHp;
-      const rewarded = choices.findIndex(c => c.reward);
-      if (rewarded >= 0 && choices[rewarded].cost) {
-        const hpCost = choices[rewarded].cost.hp || 0;
-        if (hpCost > 0 && hpRatio < 0.5) return choices.length - 1; // decline if low HP
-      }
-      return rewarded >= 0 ? rewarded : 0;
+
+      // Score each choice
+      let bestIdx = choices.length - 1; // default: last (safe) option
+      let bestScore = 0;
+      choices.forEach((c, i) => {
+        let score = 0;
+        if (!c.reward) return; // skip no-reward options unless nothing else
+        // Value rewards
+        if (c.reward.heal) score += c.reward.heal * (1.5 - hpRatio);
+        if (c.reward.rareCard) score += 15;
+        if (c.reward.cardReward) score += 10 + (c.reward.cardCount || 3) * 3;
+        if (c.reward.removeCard) score += 12;
+        // Subtract costs
+        if (c.cost && c.cost.hp) {
+          if (hpRatio < 0.4) score -= c.cost.hp * 3; // too risky when low
+          else score -= c.cost.hp;
+        }
+        if (c.cost && c.cost.gold) score -= c.cost.gold * 0.5;
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      });
+      return bestIdx;
     },
 
     pickShopCard(items, gold) {
@@ -895,6 +909,8 @@ function pickDestination(agent, connections) {
       else score -= 5;
     }
     if (loc.type === LOC_TYPES.EVENT && !cleared) score += 8;
+    // Strongly prioritize elder tree for deck improvement
+    if (id === 'elder_tree' && !cleared) score += 20;
 
     if (_simVisited.has(id)) score -= 15;
 
@@ -1180,7 +1196,151 @@ function runRushTest() {
   if (wins > 0) console.log(`  Avg HP remaining: ${(totalHp/wins).toFixed(1)}`);
 }
 
-if (args.rush) {
+// From-location test: run full games, collect states that reach a location, then continue from there
+function runFromTest(fromLoc) {
+  const elements = FORCE_ELEMENT ? [FORCE_ELEMENT] : ['fire', 'water', 'earth', 'air'];
+  const N = NUM_RUNS;
+  const agent = AGENTS.optimal;
+
+  // Phase 1: run many games, save states of those that reach fromLoc alive
+  const savedStates = [];
+  console.log(`\nPhase 1: Running ${N * elements.length} games to collect states at "${fromLoc}"...`);
+
+  for (const elem of elements) {
+    for (let i = 0; i < N; i++) {
+      const stats = { battlesFought: 0, totalTurns: 0, totalCardsPlayed: 0, error: null };
+      gameState = createGameState();
+      gameState.mode = GAME_MODES.AI;
+      gameState.player = createPlayerState(elem, STARTING_HP);
+      gameState.campaign = createCampaignState();
+      gameState.phase = GAME_PHASES.MAP;
+      _mapVisitCount = {};
+      _mapStateKey = '';
+      _simVisited = new Set();
+
+      let actions = 0;
+      while (actions < 2000) {
+        actions++;
+        if (gameState.phase === GAME_PHASES.VICTORY || gameState.phase === GAME_PHASES.GAME_OVER) break;
+
+        // Check if we reached the target location
+        if (gameState.phase === GAME_PHASES.MAP && gameState.campaign.currentLocation === fromLoc) {
+          // Save a deep copy
+          savedStates.push(JSON.parse(JSON.stringify(gameState, (k, v) => v instanceof Set ? { __set: [...v] } : v)));
+          break;
+        }
+
+        if (gameState.phase === GAME_PHASES.MAP) { simulateMapTurn(agent, stats); }
+        else if (gameState.phase === GAME_PHASES.BATTLE) { simulateBattleTurn(agent, stats); }
+        else if (gameState.phase === GAME_PHASES.CARD_REWARD) {
+          const cards = gameState._rewardCards || [];
+          if (cards.length > 0) pickRewardCard(agent.pickReward(cards));
+          else skipReward();
+        }
+        else if (gameState.phase === GAME_PHASES.REST) {
+          if (!canRest()) { clearLocation(gameState.campaign.currentLocation); returnToMap(); }
+          else {
+            const hr = gameState.player.hp / gameState.player.maxHp;
+            const allC = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+            const hasFiller = allC.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+            if (hr < 0.5) doRest();
+            else if (hasFiller) { gameState._upgradeMode = 'remove'; gameState.phase = GAME_PHASES.CARD_UPGRADE; }
+            else if (hr < 0.7) doRest();
+            else { gameState._upgradeMode = 'upgrade'; gameState.phase = GAME_PHASES.CARD_UPGRADE; }
+          }
+        }
+        else if (gameState.phase === GAME_PHASES.CARD_UPGRADE) {
+          const mode = gameState._upgradeMode || 'upgrade';
+          const allC = [...gameState.player.deck, ...gameState.player.discard];
+          const cards = mode === 'upgrade' ? allC.filter(c => !c.upgraded) : allC;
+          if (cards.length === 0) { advanceAfterNode(); continue; }
+          if (mode === 'remove') { let w=0,ws=Infinity; cards.forEach((c,i)=>{const s=c.damage+c.block+c.effects.length*3; if(s<ws){ws=s;w=i;}}); doCardAction(w); }
+          else { let b=0,bs=-1; cards.forEach((c,i)=>{const s=c.damage*2+c.block*1.5+c.effects.length*3; if(s>bs){bs=s;b=i;}}); doCardAction(b); }
+        }
+        else if (gameState.phase === GAME_PHASES.SHOP) { leaveShop(); }
+        else if (gameState.phase === GAME_PHASES.NPC) { advanceAfterNode(); }
+        else if (gameState.phase === GAME_PHASES.EVENT) {
+          const ev = EVENTS[gameState._currentEvent];
+          if (ev) doEventChoice(0);
+          else advanceAfterNode();
+        }
+        else break;
+      }
+    }
+  }
+
+  if (savedStates.length === 0) { console.log('  No games reached this location. Aborting.'); return; }
+  const avgHp = savedStates.reduce((s, st) => s + st.player.hp, 0) / savedStates.length;
+  const avgDeck = savedStates.reduce((s, st) => s + st.player.deck.length + (st.player.hand ? st.player.hand.length : 0) + (st.player.discard ? st.player.discard.length : 0), 0) / savedStates.length;
+  console.log(`  Collected ${savedStates.length} states at "${fromLoc}"`);
+  console.log(`  Avg HP: ${avgHp.toFixed(1)}/${savedStates[0].player.maxHp}  |  Avg deck: ${avgDeck.toFixed(1)} cards`);
+
+  // Phase 2: continue each saved state through the rest of the game
+  let wins = 0, deaths = 0, totalHp = 0;
+  const deathLocs = {};
+
+  for (const saved of savedStates) {
+    gameState = JSON.parse(JSON.stringify(saved), (k, v) => v && v.__set ? new Set(v.__set) : v);
+    _mapVisitCount = {};
+    _mapStateKey = '';
+    _simVisited = new Set();
+    const stats = { battlesFought: 0, totalTurns: 0, totalCardsPlayed: 0, error: null };
+
+    let actions = 0;
+    while (actions < 2000) {
+      actions++;
+      if (gameState.phase === GAME_PHASES.VICTORY) { wins++; totalHp += gameState.player.hp; break; }
+      if (gameState.phase === GAME_PHASES.GAME_OVER) {
+        deaths++;
+        const dLoc = gameState._battleLocationId || 'unknown';
+        deathLocs[dLoc] = (deathLocs[dLoc] || 0) + 1;
+        break;
+      }
+      if (gameState.phase === GAME_PHASES.MAP) { simulateMapTurn(agent, stats); }
+      else if (gameState.phase === GAME_PHASES.BATTLE) { simulateBattleTurn(agent, stats); }
+      else if (gameState.phase === GAME_PHASES.CARD_REWARD) {
+        const cards = gameState._rewardCards || [];
+        if (cards.length > 0) pickRewardCard(agent.pickReward(cards));
+        else skipReward();
+      }
+      else if (gameState.phase === GAME_PHASES.REST) {
+        if (!canRest()) { clearLocation(gameState.campaign.currentLocation); returnToMap(); }
+        else { const hr = gameState.player.hp / gameState.player.maxHp; if (hr < 0.5) doRest(); else { gameState._upgradeMode = 'upgrade'; gameState.phase = GAME_PHASES.CARD_UPGRADE; } }
+      }
+      else if (gameState.phase === GAME_PHASES.CARD_UPGRADE) {
+        const mode = gameState._upgradeMode || 'upgrade';
+        const allC = [...gameState.player.deck, ...gameState.player.discard];
+        const cards = mode === 'upgrade' ? allC.filter(c => !c.upgraded) : allC;
+        if (cards.length === 0) { advanceAfterNode(); continue; }
+        if (mode === 'remove') { let w=0,ws=Infinity; cards.forEach((c,i)=>{const s=c.damage+c.block+c.effects.length*3; if(s<ws){ws=s;w=i;}}); doCardAction(w); }
+        else { let b=0,bs=-1; cards.forEach((c,i)=>{const s=c.damage*2+c.block*1.5+c.effects.length*3; if(s>bs){bs=s;b=i;}}); doCardAction(b); }
+      }
+      else if (gameState.phase === GAME_PHASES.SHOP) { leaveShop(); }
+      else if (gameState.phase === GAME_PHASES.NPC) { advanceAfterNode(); }
+      else if (gameState.phase === GAME_PHASES.EVENT) {
+        const ev = EVENTS[gameState._currentEvent];
+        if (ev) doEventChoice(0);
+        else advanceAfterNode();
+      }
+      else break;
+    }
+  }
+
+  console.log(`\nPhase 2: Continuing from "${fromLoc}" (${savedStates.length} runs):`);
+  console.log(`  Win rate: ${wins}/${savedStates.length} (${(wins/savedStates.length*100).toFixed(1)}%)`);
+  console.log(`  Deaths: ${deaths}`);
+  if (wins > 0) console.log(`  Avg HP (wins): ${(totalHp/wins).toFixed(1)}`);
+  if (Object.keys(deathLocs).length > 0) {
+    console.log(`  Deaths by location:`);
+    Object.entries(deathLocs).sort((a, b) => b[1] - a[1]).forEach(([loc, count]) => {
+      console.log(`    ${loc}: ${count} (${(count/savedStates.length*100).toFixed(1)}%)`);
+    });
+  }
+}
+
+if (args.from) {
+  runFromTest(args.from);
+} else if (args.rush) {
   runRushTest();
 } else if (ABLATION_MODE) {
   runAblations();
