@@ -22,7 +22,7 @@ const GAME_PHASES = {
 };
 
 const MAX_ENERGY = 3;
-const DRAW_COUNT = 5;
+const DRAW_COUNT = 4;
 const STARTING_HP = 55;
 const PVP_STARTING_HP = 45;
 

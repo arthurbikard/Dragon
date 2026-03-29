@@ -266,6 +266,31 @@ const CARD_TEMPLATES = {
   },
 
   // === NEUTRAL CARDS (reward pool) ===
+  // === FILLER (weak starter cards — good remove targets) ===
+  stumble: {
+    name: 'Stumble',
+    type: CARD_TYPES.ATTACK,
+    element: null,
+    cost: 1,
+    damage: 3,
+    block: 0,
+    effects: [],
+    description: 'Deal 3 damage. Clumsy.',
+    image: 'images/card_dragon_claw.png',
+  },
+  brace: {
+    name: 'Brace',
+    type: CARD_TYPES.BLOCK,
+    element: null,
+    cost: 1,
+    damage: 0,
+    block: 3,
+    effects: [],
+    description: 'Gain 3 Block. Barely.',
+    image: 'images/card_dragon_scales.png',
+  },
+
+  // === NEUTRAL DRAGON CARDS ===
   dragon_claw: {
     name: 'Dragon Claw',
     type: CARD_TYPES.ATTACK,
@@ -303,10 +328,10 @@ const CARD_TEMPLATES = {
 
 // Starter deck compositions per element
 const STARTER_DECKS = {
-  [ELEMENTS.FIRE]: ['fire_strike', 'fire_strike', 'fire_blast', 'ember', 'ember', 'flame_shield', 'flame_shield', 'inferno', 'dragon_claw', 'dragon_scales'],
-  [ELEMENTS.WATER]: ['water_bolt', 'water_bolt', 'tidal_wave', 'ice_barrier', 'ice_barrier', 'healing_rain', 'healing_rain', 'cleanse', 'dragon_claw', 'dragon_scales'],
-  [ELEMENTS.EARTH]: ['rock_throw', 'rock_throw', 'earthquake', 'stone_wall', 'stone_wall', 'fortify', 'thorns', 'thorns', 'dragon_claw', 'dragon_scales'],
-  [ELEMENTS.AIR]: ['gust', 'gust', 'lightning', 'wind_shield', 'wind_shield', 'tailwind', 'tailwind', 'second_wind', 'dragon_claw', 'dragon_scales'],
+  [ELEMENTS.FIRE]: ['fire_strike', 'fire_strike', 'fire_blast', 'ember', 'ember', 'flame_shield', 'flame_shield', 'inferno', 'dragon_claw', 'dragon_scales', 'stumble', 'stumble', 'brace', 'brace'],
+  [ELEMENTS.WATER]: ['water_bolt', 'water_bolt', 'tidal_wave', 'ice_barrier', 'ice_barrier', 'healing_rain', 'healing_rain', 'cleanse', 'dragon_claw', 'dragon_scales', 'stumble', 'stumble', 'brace', 'brace'],
+  [ELEMENTS.EARTH]: ['rock_throw', 'rock_throw', 'earthquake', 'stone_wall', 'stone_wall', 'fortify', 'thorns', 'thorns', 'dragon_claw', 'dragon_scales', 'stumble', 'stumble', 'brace', 'brace'],
+  [ELEMENTS.AIR]: ['gust', 'gust', 'lightning', 'wind_shield', 'wind_shield', 'tailwind', 'tailwind', 'second_wind', 'dragon_claw', 'dragon_scales', 'stumble', 'stumble', 'brace', 'brace'],
 };
 
 let _cardId = 0;
