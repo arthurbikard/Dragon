@@ -64,6 +64,7 @@ const WORLD = {
           'Its corruption spreads — the fog, the dead fish, the twisted creatures on the cliffs.',
           'You must journey inland. Seek the old temples. Find a way to stop it.',
           'Start by heading west along the Whispering Cliffs. But beware what lurks there.',
+          'One more thing — the old lighthouse beyond the Veiled Sea holds a flame of great power. A serpent guards it now, but if you can best the creature... that flame could turn the tide against the drake.',
         ],
       },
     },
@@ -98,6 +99,7 @@ const WORLD = {
       image: 'images/loc_dragons_lair.png',
       enemy: 'coastal_serpent',
       goldReward: 20,
+      specialReward: 'lighthouse_flame',
     },
     shore_market: {
       name: 'Shore Market',
@@ -211,6 +213,13 @@ const RARE_CARD_TEMPLATES = {
     cost: 1, damage: 12, block: 4, effects: [],
     description: 'Deal 12 damage. Gain 4 Block.',
     image: 'images/card_dragon_claw.png', rarity: 'rare',
+  },
+  lighthouse_flame: {
+    name: 'Lighthouse Flame', type: CARD_TYPES.SKILL, element: null,
+    cost: 1, damage: 0, block: 0,
+    effects: [{ type: 'burn', value: 5, duration: 4 }, { type: 'gainEnergy', value: 1 }],
+    description: 'Apply 5 Burn for 4 turns. Gain 1 Energy. A flame that never dies.',
+    image: 'images/card_inferno.png', rarity: 'legendary',
   },
 };
 

@@ -598,6 +598,16 @@ function handleDeath() {
       // Generate rewards based on biome
       const biomeId = loc ? loc.biome : null;
 
+      // Special reward (e.g. lighthouse)
+      if (loc && loc.specialReward) {
+        const specialCard = getRareCardByKey(loc.specialReward);
+        if (specialCard) {
+          gameState.player.deck.push(specialCard);
+          addLog(`Found: ${specialCard.name}!`);
+          if (typeof showNotification === 'function') showNotification(`+ ${specialCard.name}`, 'card');
+        }
+      }
+
       if (gameState._battleIsElite) {
         gameState._rewardCards = [getRareCard(), getRareCard(), ...getBiomeRewardCards(biomeId, 1)];
         gameState.campaign.gold += 10;
