@@ -281,7 +281,7 @@ function renderEnergy(energy) {
 function renderStatuses(actor) {
   if (!actor.statuses.length) return '';
   return `<div class="statuses">${actor.statuses.map(s => {
-    const icons = { burn: '🔥', thorns: '🌿', vulnerable: '💔' };
+    const icons = { burn: '🔥', thorns: '🌿', vulnerable: '💔', strength: '💪', weak: '😵' };
     return `<span class="status-badge status-${s.type}" title="${s.type}: ${s.value} (${s.duration} turns)">${icons[s.type] || '?'} ${s.value}</span>`;
   }).join('')}</div>`;
 }

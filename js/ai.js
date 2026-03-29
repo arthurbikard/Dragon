@@ -69,7 +69,7 @@ const AI_ENEMIES = [
     // Buffs itself — snowballs but lower HP so fast kills work
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 1 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 1, duration: 3 }], weight: 2 },
       { type: INTENT_TYPES.ATTACK, damage: 10, weight: 1 },
     ],
   },
@@ -133,7 +133,7 @@ const AI_ENEMIES = [
       { type: INTENT_TYPES.ATTACK, damage: 14, weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 24, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 12, weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 3 }], weight: 2 },
     ],
   },
 
@@ -150,7 +150,7 @@ const AI_ENEMIES = [
       { type: INTENT_TYPES.ATTACK, damage: 13, weight: 3 },
       { type: INTENT_TYPES.HEAVY_ATTACK, damage: 24, weight: 1 },
       { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2 }], weight: 1 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 3 }], weight: 1 },
     ],
   },
 ];
@@ -171,7 +171,6 @@ function createAIEnemy(indexOrId) {
     image: template.image,
     block: 0,
     statuses: [],
-    strength: 0, // +damage per attack
     intents: template.intents,
     nextIntent: null,
     hand: [],
@@ -211,7 +210,8 @@ function executeAITurn() {
 
   // Execute intent
   if (intent.damage) {
-    let dmg = intent.damage + (enemy.strength || 0);
+    const strStatus = enemy.statuses ? enemy.statuses.find(s => s.type === 'strength') : null;
+    let dmg = intent.damage + (strStatus ? strStatus.value : 0);
     const vuln = player.statuses.find(s => s.type === 'vulnerable');
     if (vuln) dmg = Math.floor(dmg * 1.5);
     // Weak reduces incoming damage from enemy? No — weak applies to the weakened entity's OWN attacks
@@ -230,8 +230,15 @@ function executeAITurn() {
   if (intent.effects) {
     for (const effect of intent.effects) {
       if (effect.type === 'strength') {
-        enemy.strength = (enemy.strength || 0) + effect.value;
-        addLog(`${enemy.name} gains ${effect.value} Strength!`);
+        const existing = enemy.statuses ? enemy.statuses.find(s => s.type === 'strength') : null;
+        if (existing) {
+          existing.value += effect.value;
+          existing.duration = Math.max(existing.duration, effect.duration || 3);
+        } else {
+          if (!enemy.statuses) enemy.statuses = [];
+          enemy.statuses.push({ type: 'strength', value: effect.value, duration: effect.duration || 3 });
+        }
+        addLog(`${enemy.name} gains ${effect.value} Strength for ${effect.duration || 3} turns!`);
       } else if (['burn', 'vulnerable', 'weak'].includes(effect.type)) {
         applyEffect(effect, enemy, player);
       } else if (['thorns'].includes(effect.type)) {
