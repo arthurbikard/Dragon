@@ -15,6 +15,7 @@ function renderMap() {
         <span class="map-gold">💰 ${campaign.gold}</span>
         <span class="map-deck" onclick="openDeckViewer()" style="cursor:pointer">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
         <span class="map-hp">❤️ ${gameState.player.hp}/${gameState.player.maxHp}</span>
+        <span class="map-menu-btn" onclick="openGameMenu()">⚙</span>
         ${MAP_DEBUG ? '<button class="map-debug-btn" onclick="exportNodePositions()">📋 Export</button>' : ''}
       </div>
       <div class="world-viewport" id="worldViewport">
@@ -517,6 +518,35 @@ function openRemoveSelect() {
   gameState._upgradeMode = 'remove';
   gameState.phase = GAME_PHASES.CARD_UPGRADE;
   renderGame();
+}
+
+// === GAME MENU ===
+
+function openGameMenu() {
+  const overlay = document.createElement('div');
+  overlay.className = 'game-menu-overlay';
+  overlay.id = 'gameMenu';
+  overlay.innerHTML = `
+    <div class="game-menu">
+      <h2 class="screen-title">Menu</h2>
+      <button class="btn btn-primary" onclick="closeGameMenu()">Resume</button>
+      <button class="btn btn-secondary" onclick="confirmQuit()">Quit to Title</button>
+    </div>
+  `;
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeGameMenu();
+  });
+  document.getElementById('app').appendChild(overlay);
+}
+
+function closeGameMenu() {
+  const el = document.getElementById('gameMenu');
+  if (el) el.remove();
+}
+
+function confirmQuit() {
+  closeGameMenu();
+  returnToMenu();
 }
 
 // === DECK VIEWER ===

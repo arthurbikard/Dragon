@@ -1274,6 +1274,38 @@ html, body {
 .map-deck { color: var(--parchment); text-decoration: underline; text-underline-offset: 2px; }
 .map-hp { color: var(--hp-green); }
 
+.map-menu-btn {
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+.map-menu-btn:active { opacity: 1; }
+
+/* Game Menu */
+.game-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(8, 8, 16, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.game-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 30px 40px;
+  background: var(--obsidian);
+  border: 1px solid rgba(212, 160, 56, 0.2);
+  border-radius: 8px;
+}
+
+.game-menu .btn { width: 160px; }
+
 /* Deck Viewer */
 .deck-viewer-overlay {
   position: fixed;
