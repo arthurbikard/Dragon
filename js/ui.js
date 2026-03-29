@@ -148,8 +148,10 @@ function renderBattle() {
   const isPVP = gameState.mode === GAME_MODES.PVP;
   const isPlayerTurn = gameState.currentTurn === 'player';
 
-  const topCombatant = isPlayerTurn ? gameState.enemy : gameState.player;
-  const bottomCombatant = isPlayerTurn ? gameState.player : gameState.enemy;
+  // In AI mode, always show enemy on top / player on bottom
+  // In PVP, swap based on whose turn it is
+  const topCombatant = (!isPVP || isPlayerTurn) ? gameState.enemy : gameState.player;
+  const bottomCombatant = (!isPVP || isPlayerTurn) ? gameState.player : gameState.enemy;
   const actor = getCurrentActor();
   const canAct = isPVP || isPlayerTurn;
 
