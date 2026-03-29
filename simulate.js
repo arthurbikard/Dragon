@@ -884,10 +884,15 @@ function pickDestination(agent, connections) {
     if (loc.type === LOC_TYPES.REST && hpRatio < 0.6 && canRest()) score += 15;
     if (loc.type === LOC_TYPES.REST && !canRest()) score -= 5;
     if (loc.type === LOC_TYPES.SHOP && campaign.gold >= 8) score += 10;
-    if (loc.type === LOC_TYPES.ELITE && hpRatio > 0.7) score += 12;
-    if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.5) score -= 10;
+    // Strongly prioritize elite (lighthouse) before boss — the special reward is key
+    if (loc.type === LOC_TYPES.ELITE && !cleared && hpRatio > 0.5) score += 25;
+    if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.4) score -= 10;
     if (loc.type === LOC_TYPES.MINI_BOSS || loc.type === LOC_TYPES.BOSS) {
-      score += hpRatio > 0.6 ? 8 : -5;
+      // Only go to boss after clearing the elite
+      const eliteCleared = Object.entries(WORLD.locations).some(([id, l]) => l.type === LOC_TYPES.ELITE && campaign.cleared.has(id));
+      if (eliteCleared && hpRatio > 0.5) score += 15;
+      else if (!eliteCleared) score -= 20;
+      else score -= 5;
     }
     if (loc.type === LOC_TYPES.EVENT && !cleared) score += 8;
 
@@ -1144,7 +1149,40 @@ function runAblations() {
   console.log('');
 }
 
-if (ABLATION_MODE) {
+// Rush test: go straight to boss with starter deck
+function runRushTest() {
+  const elements = FORCE_ELEMENT ? [FORCE_ELEMENT] : ['fire', 'water', 'earth', 'air'];
+  const N = NUM_RUNS;
+  let wins = 0, totalHp = 0, total = 0;
+
+  for (const elem of elements) {
+    for (let i = 0; i < N; i++) {
+      total++;
+      gameState = createGameState();
+      gameState.mode = GAME_MODES.AI;
+      gameState.player = createPlayerState(elem, STARTING_HP);
+      gameState.campaign = createCampaignState();
+      gameState.phase = GAME_PHASES.MAP;
+      travelTo('thornwood_gate');
+      gameState._battleLocationId = 'thornwood_gate';
+      startNodeBattle('storm_drake', 25);
+      const stats = { totalTurns: 0, totalCardsPlayed: 0 };
+      simulateBattleTurn(AGENTS.optimal, stats);
+      if (gameState.enemy && gameState.enemy.hp <= 0) {
+        wins++;
+        totalHp += gameState.player.hp;
+      }
+    }
+  }
+
+  console.log(`\nRush boss test (optimal agent, starter deck, ${total} runs):`);
+  console.log(`  Win rate: ${wins}/${total} (${(wins/total*100).toFixed(1)}%)`);
+  if (wins > 0) console.log(`  Avg HP remaining: ${(totalHp/wins).toFixed(1)}`);
+}
+
+if (args.rush) {
+  runRushTest();
+} else if (ABLATION_MODE) {
   runAblations();
 } else {
   runSimulations();

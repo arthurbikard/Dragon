@@ -64,6 +64,7 @@ const WORLD = {
           'Its corruption spreads — the fog, the dead fish, the twisted creatures on the cliffs.',
           'You must journey inland. Seek the old temples. Find a way to stop it.',
           'Start by heading west along the Whispering Cliffs. But beware what lurks there.',
+          'Do not rush to face the Storm Drake at the gate. Many brave souls have tried and perished. Build your strength first — fight, trade, explore.',
           'One more thing — the old lighthouse beyond the Veiled Sea holds a flame of great power. A serpent guards it now, but if you can best the creature... that flame could turn the tide against the drake.',
         ],
       },
