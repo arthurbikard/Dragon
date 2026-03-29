@@ -153,7 +153,7 @@ const EVENTS = {
     title: 'The Sea Cave',
     description: 'Phosphorescent algae casts an eerie blue glow. Deep inside, you find a shrine and a sealed chest.',
     choices: [
-      { text: 'Open the chest (risk)', cost: { hp: 5 }, reward: { rareCard: true }, result: 'The chest\'s guardian spirit lashes out — but you claim the power within.' },
+      { text: 'Open the chest (risk)', cost: { hp: 10 }, reward: { rareCard: true }, result: 'The chest\'s guardian spirit lashes out — but you claim the power within.' },
       { text: 'Pray at the shrine', cost: null, reward: { heal: 12 }, result: 'The shrine\'s warmth washes over you, mending your wounds.' },
       { text: 'Leave carefully', cost: null, reward: null, result: 'You retreat from the cave. Some treasures aren\'t worth the risk.' },
     ],
