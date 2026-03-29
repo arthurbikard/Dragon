@@ -1,12 +1,11 @@
 # Dragon Cards — TODO
 
-## Current Version: v0.7.0
+## Current Version: v0.8.0
 
 ## Priorities
 
 ### P0 — Critical (blocks playtesting)
-- [ ] **Simulator broken** — `simulate.js` references old branching map API (`NODE_TYPES`, `MAP_CONFIG`, `onNodeSelect`). Needs rewrite for world map navigation.
-- [ ] **Victory condition** — No boss in the current coast biome. Need to either add a final boss location or make Storm Bluff mini-boss trigger victory for testing.
+- None currently
 
 ### P1 — High (next sprint)
 - [ ] **Biome 2: Thornwood Forest** — ~10 locations, forest-themed enemies, hermit NPC, Tide Walker blessing gate
@@ -20,8 +19,6 @@
 - [ ] **Card synergies** — Exhaust, Retain, Combo keywords (from DESIGN_PRINCIPLES.md Fix 4)
 - [ ] **Biome-specific card pools** — Coast rewards water/defensive, forest rewards earth/thorns, etc.
 - [ ] **Enemy variety per biome** — 2-3 unique enemy types per biome
-- [ ] **Status effect rebalance** — Enemy thorns/strength still net-hurt the player (ablation: +14.8pp trap)
-- [ ] **Elite rebalance** — Fighting elites is still a losing proposition (ablation: +15.9pp trap)
 
 ### P3 — Low (polish)
 - [ ] **Sound effects** — Battle hits, card play, victory/defeat
@@ -35,40 +32,46 @@
 ## Known Bugs
 - [ ] `diedAt` shows enemy ID instead of location name in simulator
 - [ ] Shop can be revisited infinitely (by design? or should restock cost gold?)
-- [ ] Rest sites can be revisited infinitely (intentional — but should they be limited?)
 - [ ] NPC dialogue replays every visit (should show shorter text on revisit)
 - [ ] Card upgrade description text replacement is fragile (regex on description string)
 - [ ] PVP mode hasn't been tested since v0.6.0 overhaul — may be broken
 
-## Balance Status (from ablation testing, v0.6.1)
+## Balance Status (v0.8.0)
 
-### Win Rates (n=2000)
+### Win Rates (n=800)
 | Agent | Rate | Target | Status |
 |-------|------|--------|--------|
-| Random | 6.4% | <3% | Slightly high |
-| Greedy | 9.6% | 5-15% | Good |
-| Optimal | 44.5% | 25-50% | Good |
+| Random | ~1% | <3% | Good |
+| Greedy | ~3% | 5-15% | Slightly hard |
+| Optimal | ~32% | 25-50% | Good |
+| Rush (starter only) | ~3.5% | <5% | Good |
 
-### Mechanic Impact (ablation delta from baseline)
-| Mechanic | Delta | Status |
-|----------|-------|--------|
-| Block cards | -21.2pp | Critical (good) |
-| Card rewards | -14.1pp | Critical (good) |
-| Rest/upgrade/remove | -12.8pp | Critical (good) |
-| Events | -8.6pp | Critical (good) |
-| Gold/shop | -5.6pp | Critical (good) |
-| Double enemy HP | -40.7pp | Critical (good) |
-| Status effects | +14.8pp | **Trap — needs fix** |
-| Elites | +15.9pp | **Trap — needs fix** |
-| Skip non-combat | +14.2pp | **Trap — needs fix** |
-
-### Design Debt
-- Status effects (burn/thorns/vulnerable from enemies) still net-hurt the player
-- Elite fights cost more HP than their rare cards compensate
-- Skipping all non-combat nodes still increases win rate (non-combat content needs more value)
+### Recent Balance Changes
+- Starter deck: 14 cards (10 real + 2 Stumble + 2 Brace filler)
+- Draw count: 4 per turn (was 5)
+- Rest cooldown: must fight 2 battles between rests
+- Ambush system: 15% on non-combat, 30% on cleared combat locations
+- Strength is now duration-based (3 turns, no longer permanent)
+- Storm Drake: 200 HP, 14/24 damage — near-impossible to rush
+- Water/Earth starter cards buffed for element balance
+- Lighthouse Flame legendary card reward for beating elite
 
 ## Completed (recent)
 
+- [x] v0.8.0 — Rest cooldown (2 battles between rests)
+- [x] v0.8.0 — Ambush system (random encounters when traveling)
+- [x] v0.8.0 — Deck viewer on map (tap card count)
+- [x] v0.8.0 — Floating notifications for HP/gold/card changes
+- [x] v0.8.0 — Filler cards (Stumble/Brace) to dilute starter deck
+- [x] v0.8.0 — Strength now expires after 3 turns
+- [x] v0.8.0 — Lighthouse Flame legendary reward + elder NPC hint
+- [x] v0.8.0 — Storm Drake buffed to 200 HP (punishes rushing)
+- [x] v0.8.0 — Water/Earth element balance (buffed starter damage)
+- [x] v0.8.0 — Map rework: new connections, renamed veiled_sea
+- [x] v0.8.0 — Debug ?phase= URL param for testing screens
+- [x] v0.8.0 — Fixed upgrade screen (cards not visible due to CSS)
+- [x] v0.8.0 — Fixed card consolidation on map return
+- [x] v0.8.0 — Minimum font size 0.6rem across all gameplay text
 - [x] v0.7.0 — World map engine + Whispering Coast (8 locations)
 - [x] v0.7.0 — Fog of war, path navigation, location panel
 - [x] v0.7.0 — NPC dialogue system (multi-line with portrait)

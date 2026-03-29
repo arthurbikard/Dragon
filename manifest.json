@@ -4,6 +4,7 @@
   "description": "A Slay the Spire-inspired dragon card game",
   "start_url": ".",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "portrait",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
