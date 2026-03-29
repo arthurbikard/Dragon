@@ -325,19 +325,22 @@ function canRest() {
   return gameState.campaign.battlesSinceRest >= REST_COOLDOWN_BATTLES;
 }
 
-// Ambush: chance of random combat when traveling to non-combat locations
-const AMBUSH_CHANCE = 0.15; // 15% chance per travel
+// Ambush: chance of random combat when traveling
+const AMBUSH_CHANCE = 0.15; // 15% for non-combat locations
+const AMBUSH_CHANCE_CLEARED = 0.30; // 30% for cleared combat locations
 
 function rollAmbush(locId) {
   const loc = WORLD.locations[locId];
   if (!loc) return null;
-  // No ambush on combat locations (already fighting), or start village, or first 2 locations visited
-  const isCombat = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type);
-  if (isCombat) return null;
   if (gameState.campaign.visited.size <= 3) return null; // safe early game
 
-  if (Math.random() < AMBUSH_CHANCE) {
-    // Pick a random enemy from the biome's enemy pool
+  const isCombat = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type);
+  // No ambush on uncleared combat locations (already fighting there)
+  if (isCombat && !gameState.campaign.cleared.has(locId)) return null;
+
+  const chance = isCombat ? AMBUSH_CHANCE_CLEARED : AMBUSH_CHANCE;
+
+  if (Math.random() < chance) {
     const biome = WORLD.biomes[loc.biome];
     if (!biome || !biome.enemyPool || biome.enemyPool.length === 0) return null;
     return biome.enemyPool[Math.floor(Math.random() * biome.enemyPool.length)];
