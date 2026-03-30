@@ -671,6 +671,39 @@ function closeDeckViewer() {
 
 function renderCardUpgrade() {
   const mode = gameState._upgradeMode || 'upgrade';
+
+  // Show upgrade preview if a card is selected
+  if (mode === 'upgrade' && gameState._upgradePreviewCardId) {
+    const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+    const original = allCards.find(c => c.id === gameState._upgradePreviewCardId);
+    if (original) {
+      // Create a deep copy and upgrade it for preview
+      const preview = JSON.parse(JSON.stringify(original));
+      preview.effects = preview.effects.map(e => ({ ...e }));
+      upgradeCard(preview);
+      return `
+        <div class="screen upgrade-screen">
+          <h2 class="screen-title">Upgrade Preview</h2>
+          <div class="upgrade-compare">
+            <div class="upgrade-compare-card">
+              <p class="upgrade-compare-label">Before</p>
+              ${renderCard(original, -1, false)}
+            </div>
+            <div class="upgrade-arrow">${icon('arrow-up', 28, '#55cc55')}</div>
+            <div class="upgrade-compare-card">
+              <p class="upgrade-compare-label">After</p>
+              ${renderCard(preview, -1, false)}
+            </div>
+          </div>
+          <div class="upgrade-confirm-btns">
+            <button class="btn btn-primary" onclick="confirmUpgrade()">Upgrade</button>
+            <button class="btn btn-skip" onclick="cancelUpgradePreview()">Back</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   const title = mode === 'remove' ? 'Remove a Card' : 'Upgrade a Card';
   const hint = mode === 'remove' ? 'Select a card to remove' : 'Select a card to upgrade';
   const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
@@ -722,16 +755,33 @@ function doCardAction(index) {
       gameState.campaign.gold -= CARD_REMOVE_PRICE;
     }
   } else {
-    const actual = gameState.player.deck.find(c => c.id === card.id)
-      || gameState.player.discard.find(c => c.id === card.id);
-    if (actual) {
-      upgradeCard(actual);
-      addLog(`Upgraded ${actual.name}!`);
-    }
+    // Show upgrade preview instead of immediately upgrading
+    gameState._upgradePreviewCardId = card.id;
+    renderGame();
+    return;
   }
 
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
+}
+
+function confirmUpgrade() {
+  const cardId = gameState._upgradePreviewCardId;
+  delete gameState._upgradePreviewCardId;
+  const actual = gameState.player.deck.find(c => c.id === cardId)
+    || gameState.player.discard.find(c => c.id === cardId)
+    || gameState.player.hand.find(c => c.id === cardId);
+  if (actual) {
+    upgradeCard(actual);
+    addLog(`Upgraded ${actual.name}!`);
+  }
+  clearLocation(gameState.campaign.currentLocation);
+  returnToMap();
+}
+
+function cancelUpgradePreview() {
+  delete gameState._upgradePreviewCardId;
+  renderGame();
 }
 
 // === SHOP ===

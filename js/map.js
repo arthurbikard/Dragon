@@ -172,6 +172,7 @@ const WORLD = {
       blessing: 'tide_walker',
       miniBossVictory: {
         title: 'The Storm Drake Falls',
+        image: 'images/storm_drake_victory.png',
         lines: [
           'The storm drake crashes to the ground, its wings torn and sparking.',
           'As the dust settles, you notice a glinting amulet tangled around its neck — the Tidecaller\'s Charm.',

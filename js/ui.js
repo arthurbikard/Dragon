@@ -485,19 +485,30 @@ function renderCardReward() {
 function renderMiniBossVictory() {
   const mbv = gameState._miniBossVictory;
   if (!mbv) return '';
+  const bgStyle = mbv.image ? `background-image: url('${mbv.image}'); background-size: cover; background-position: center;` : '';
   return `
-    <div class="screen mini-boss-victory-screen">
-      <h2 class="screen-title">${mbv.title}</h2>
-      <div class="mbv-story">
-        ${mbv.lines.map(l => `<p>${l}</p>`).join('')}
+    <div class="screen mini-boss-victory-screen" style="${bgStyle}">
+      <div class="mbv-amulet-hotspot" onclick="revealMbvStory()"></div>
+      <div class="mbv-overlay mbv-hidden" id="mbvOverlay">
+        <h2 class="screen-title">${mbv.title}</h2>
+        <div class="mbv-story">
+          ${mbv.lines.map(l => `<p>${l}</p>`).join('')}
+        </div>
+        <div class="mbv-reward">
+          <div class="mbv-reward-name">${mbv.reward}</div>
+          <div class="mbv-reward-desc">${mbv.rewardDesc}</div>
+        </div>
+        <button class="btn btn-primary" onclick="continueAfterMiniBoss()">Continue</button>
       </div>
-      <div class="mbv-reward">
-        <div class="mbv-reward-name">${mbv.reward}</div>
-        <div class="mbv-reward-desc">${mbv.rewardDesc}</div>
-      </div>
-      <button class="btn btn-primary" onclick="continueAfterMiniBoss()">Continue</button>
     </div>
   `;
+}
+
+function revealMbvStory() {
+  const overlay = document.getElementById('mbvOverlay');
+  if (overlay) overlay.classList.remove('mbv-hidden');
+  const hotspot = document.querySelector('.mbv-amulet-hotspot');
+  if (hotspot) hotspot.style.display = 'none';
 }
 
 function continueAfterMiniBoss() {
@@ -643,6 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
       gameState.campaign.gold = 50;
       gameState._shopCards = getAvailableShopCards();
       gameState.phase = GAME_PHASES.SHOP;
+    } else if (debugPhase === 'mini_boss_victory') {
+      const loc = WORLD.locations['thornwood_gate'];
+      gameState._miniBossVictory = loc.miniBossVictory;
+      gameState._pendingRewardBiome = loc.biome;
+      gameState._pendingRewardLoc = loc;
+      gameState.phase = 'mini_boss_victory';
     }
     renderGame();
     return;

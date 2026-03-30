@@ -2057,11 +2057,55 @@ html, body {
 
 /* Mini-boss victory screen */
 .mini-boss-victory-screen {
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  gap: 20px;
-  padding: 20px;
+  padding: 0;
   text-align: center;
+  background-size: contain !important;
+  background-position: top center !important;
+  background-repeat: no-repeat !important;
+  background-color: #0a0a0f;
+}
+
+.mbv-amulet-hotspot {
+  position: absolute;
+  bottom: 13%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  background: radial-gradient(circle, rgba(100, 180, 255, 0.3) 0%, transparent 70%);
+  animation: amuletGlow 2s ease-in-out infinite;
+}
+
+@keyframes amuletGlow {
+  0%, 100% { box-shadow: 0 0 20px 8px rgba(100, 180, 255, 0.3); }
+  50% { box-shadow: 0 0 40px 16px rgba(100, 180, 255, 0.6); }
+}
+
+.mbv-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.mbv-overlay:not(.mbv-hidden) {
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+
+.mbv-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 20px calc(20px + var(--safe-bottom));
+  margin-top: auto;
+  width: 100%;
+  background: linear-gradient(to top, rgba(10, 10, 15, 0.95) 0%, rgba(10, 10, 15, 0.8) 60%, transparent 100%);
 }
 
 .mbv-story {
@@ -2105,6 +2149,37 @@ html, body {
   gap: 12px;
   padding: 16px;
   text-align: center;
+}
+
+.upgrade-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.upgrade-compare-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.upgrade-compare-label {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.upgrade-arrow {
+  padding-top: 20px;
+}
+
+.upgrade-confirm-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .upgrade-hint {
