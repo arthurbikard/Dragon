@@ -179,6 +179,10 @@
       <input type="number" id="numRuns" value="20" min="1" max="500">
     </div>
     <div class="control-group">
+      <label for="maxActions">Max actions:</label>
+      <input type="number" id="maxActions" value="5000" min="100" max="50000" step="500">
+    </div>
+    <div class="control-group">
       <label>Agents:</label>
       <div class="checkbox-group">
         <label class="checkbox-label">
@@ -201,6 +205,8 @@
     </div>
     <button id="runBtn" onclick="startSimulation()">Run</button>
     <button class="clear-btn" onclick="clearCanvas()">Clear</button>
+    <button class="clear-btn" onclick="document.getElementById('traceFile').click()">Load Traces</button>
+    <input type="file" id="traceFile" accept=".json" style="display:none" onchange="loadTraceFile(event)">
   </div>
 
   <div class="canvas-container">
@@ -695,7 +701,7 @@
       trace: [],
     };
 
-    const MAX_ACTIONS = 5000;
+    const MAX_ACTIONS = parseInt(document.getElementById('maxActions')?.value) || 5000;
 
     try {
       _simRunning = true;
@@ -1054,22 +1060,56 @@
       const ey = toCanvasY(last.deckScore);
 
       if (outcome === 'death') {
-        ctx.strokeStyle = '#e04040';
-        ctx.lineWidth = 2.5;
-        const s = 5;
+        // Large red X with glow
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 3.5;
+        const s = 8;
         ctx.beginPath();
         ctx.moveTo(ex - s, ey - s); ctx.lineTo(ex + s, ey + s);
         ctx.moveTo(ex + s, ey - s); ctx.lineTo(ex - s, ey + s);
         ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Skull label
+        ctx.fillStyle = '#ff6666';
+        ctx.font = 'bold 10px Cinzel, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('☠', ex, ey - 12);
       } else if (outcome === 'victory') {
-        drawStar(ex, ey, 5, 7, 3, '#40c040');
+        // Large green star with glow
+        ctx.shadowColor = '#00ff00';
+        ctx.shadowBlur = 12;
+        drawStar(ex, ey, 5, 12, 5, '#44ee44');
+        ctx.shadowBlur = 0;
+        // Victory label
+        ctx.fillStyle = '#44ff44';
+        ctx.font = 'bold 10px Cinzel, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('WIN', ex, ey - 14);
       }
 
-      // Small agent-colored ring around endpoint
+      if (outcome === 'error') {
+        // Orange circle with ? for stuck/timeout
+        ctx.shadowColor = '#ff8800';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = '#ff8800';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffaa33';
+        ctx.font = 'bold 11px Cinzel, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', ex, ey + 4);
+      }
+
+      // Agent-colored ring around endpoint
       ctx.strokeStyle = agentColor;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+      ctx.arc(ex, ey, 10, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -1210,6 +1250,31 @@
     drawBackground();
     updateLegend();
     updateStatus('');
+  }
+
+  function loadTraceFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const traces = JSON.parse(e.target.result);
+        if (!Array.isArray(traces)) throw new Error('Expected array');
+        for (const t of traces) {
+          allTraces.push({ points: t.points, color: t.color, outcome: t.outcome });
+          const agentKey = t.agent;
+          runCounts[agentKey] = (runCounts[agentKey] || 0) + 1;
+          if (t.outcome === 'victory') winCounts[agentKey] = (winCounts[agentKey] || 0) + 1;
+        }
+        drawAllTraces();
+        updateLegend();
+        updateStatus(`Loaded ${traces.length} traces from ${file.name}`, 'done');
+      } catch (err) {
+        updateStatus('Error loading traces: ' + err.message, '');
+      }
+      event.target.value = ''; // reset file input
+    };
+    reader.readAsText(file);
   }
 
   // Initial draw

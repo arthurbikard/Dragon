@@ -70,6 +70,7 @@ const FORCE_ELEMENT = args.element || null;
 const VERBOSE = !!args.verbose;
 const JSON_OUTPUT = !!args.json;
 const ABLATION_MODE = args.ablation || null;
+const TRACE_OUTPUT = args.trace ? (args.trace === true ? 'sim-traces.json' : args.trace) : null;
 
 // === Ablation Definitions ===
 const ABLATIONS = {
@@ -907,6 +908,7 @@ function simulateGame(agent, element, ablation) {
           hp: gameState.player.hp,
           maxHp: gameState.player.maxHp,
           deckScore: scoreDeck(gameState.player),
+          nodesExplored: gameState.campaign ? gameState.campaign.explored.size : 0,
           location: gameState.campaign.currentLocation,
           action: actions,
         });
@@ -926,6 +928,7 @@ function simulateGame(agent, element, ablation) {
           hp: gameState.player.hp,
           maxHp: gameState.player.maxHp,
           deckScore: scoreDeck(gameState.player),
+          nodesExplored: gameState.campaign ? gameState.campaign.explored.size : 0,
           location: gameState.campaign ? gameState.campaign.currentLocation : 'unknown',
           action: actions,
         });
@@ -1511,6 +1514,25 @@ function runSimulations() {
       };
     }
     console.log(JSON.stringify(jsonOutput, null, 2));
+  }
+
+  // Trace output for live-sim.html visualization
+  if (TRACE_OUTPUT) {
+    const agentColors = { random: '#888888', explorer: '#4488dd', optimal: '#c8a96e', lookahead: '#cc55cc', expert: '#44cccc' };
+    const traces = [];
+    for (const agentName of agentNames) {
+      const results = allResults[agentName];
+      for (const r of results) {
+        traces.push({
+          agent: agentName,
+          color: agentColors[agentName] || '#888888',
+          outcome: r.won ? 'victory' : (r.error ? 'error' : 'death'),
+          points: r.trace || [],
+        });
+      }
+    }
+    fs.writeFileSync(TRACE_OUTPUT, JSON.stringify(traces));
+    console.log(`Traces saved to ${TRACE_OUTPUT} (${traces.length} runs)`);
   }
 }
 
