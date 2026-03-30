@@ -1863,6 +1863,12 @@ html, body {
   border-color: var(--gold);
 }
 
+.rest-choice-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .rest-choice-icon {
   font-size: 1.5rem;
   flex-shrink: 0;
@@ -1963,6 +1969,65 @@ html, body {
   gap: 10px;
   width: 100%;
   max-width: 280px;
+}
+
+/* Tree offering */
+.tree-offering-screen {
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  text-align: center;
+  background: linear-gradient(to bottom, #0a1a0a, #0a0a0f);
+}
+
+.tree-phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.tree-hidden {
+  display: none !important;
+}
+
+.tree-narration {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 1rem;
+  color: #aab89a;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.tree-card-offered,
+.tree-card-reward {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.tree-card-offered .card,
+.tree-card-reward .card {
+  pointer-events: none;
+}
+
+.tree-card-offered {
+  opacity: 0.7;
+  filter: sepia(0.5) hue-rotate(60deg);
+}
+
+.tree-card-reward {
+  filter: drop-shadow(0 0 12px rgba(100, 200, 80, 0.4));
+  transform: scale(1.2);
+  margin: 12px 0;
+}
+
+.tree-narration-gained {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: #88cc88;
 }
 
 /* Chest animation */

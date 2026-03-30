@@ -17,6 +17,7 @@ function renderMap() {
         <span class="map-hp">${icon('heart', 16, '#e05555')} ${gameState.player.hp}/${gameState.player.maxHp}</span>
         <span class="map-menu-btn" onclick="openGameMenu()">${icon('gear', 18, '#c8a96e')}</span>
         ${MAP_DEBUG ? `<button class="map-debug-btn" onclick="exportNodePositions()">${icon('clipboard', 14)} Export</button>
+        <button class="map-debug-btn" onclick="toggleMoveMode()" style="${_moveMode ? 'background:#48a' : ''}">${icon('arrow-up', 14)} ${_moveMode ? 'Move ON' : 'Move'}</button>
         <button class="map-debug-btn" onclick="toggleLinkMode()" id="linkModeBtn" style="${_linkMode ? 'background:#c44' : ''}">${icon('link', 14)} ${_linkMode ? 'Link ON' : 'Link'}</button>
         <button class="map-debug-btn" onclick="exportConnections()">${icon('clipboard', 14)} Paths</button>` : ''}
       </div>
@@ -62,7 +63,7 @@ function initDragListeners() {
   canvas.addEventListener('mousedown', (e) => {
     const node = e.target.closest('.world-location');
     if (!node) return;
-    if (_linkMode) return; // let onclick handle it
+    if (!_moveMode) return; // only drag in move mode
     e.preventDefault();
     e.stopPropagation();
     _dragTarget = node;
@@ -111,7 +112,7 @@ function initDragListeners() {
   canvas.addEventListener('touchstart', (e) => {
     const node = e.target.closest('.world-location');
     if (!node) return;
-    if (_linkMode) return;
+    if (!_moveMode) return;
     e.preventDefault();
     _dragTarget = node;
     _didDrag = false;
@@ -198,10 +199,18 @@ function exportNodePositions() {
 // === DEBUG: Link mode (edit connections) ===
 var _linkMode = false;
 var _linkSource = null;
+var _moveMode = false;
+
+function toggleMoveMode() {
+  _moveMode = !_moveMode;
+  if (_moveMode) _linkMode = false;
+  renderGame();
+}
 
 function toggleLinkMode() {
   _linkMode = !_linkMode;
   _linkSource = null;
+  if (_linkMode) _moveMode = false;
   renderGame();
 }
 
@@ -249,6 +258,17 @@ function onDebugNodeClick(locId) {
   return true;
 }
 
+function debugEnterLocation(locId) {
+  if (_dragTarget || _didDrag) { _didDrag = false; return; }
+  // Teleport to location and enter it
+  gameState.campaign.currentLocation = locId;
+  gameState.campaign.explored.add(locId);
+  gameState.campaign.visited.add(locId);
+  // Unmark cleared so we can re-enter
+  gameState.campaign.cleared.delete(locId);
+  enterLocation();
+}
+
 function exportConnections() {
   const lines = [];
   for (const [id, loc] of Object.entries(WORLD.locations)) {
@@ -290,7 +310,7 @@ function renderWorldLocations() {
       <div class="world-location ${stateClass} ${canTravel ? 'loc-tappable' : ''}"
            style="left: ${pos.x}px; top: ${pos.y}px"
            data-loc-id="${id}"
-           onclick="${MAP_DEBUG && _linkMode ? `onDebugNodeClick('${id}')` : (canTravel || isCurrent ? `onLocationTap('${id}')` : '')}">
+           onclick="${MAP_DEBUG ? (_linkMode ? `onDebugNodeClick('${id}')` : (_moveMode ? '' : `debugEnterLocation('${id}')`)) : (canTravel || isCurrent ? `onLocationTap('${id}')` : '')}">
         <div class="loc-node" style="${imgStyle}">
           ${!loc.image ? `<span class="loc-icon">${locIcon}</span>` : ''}
         </div>
@@ -551,7 +571,13 @@ function enterLocation() {
 // === REST SCREEN ===
 
 function renderRest() {
-  const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
+  const healAmount = Math.min(Math.floor(gameState.player.maxHp * REST_HEAL_FRACTION), gameState.player.maxHp - gameState.player.hp);
+  const gold = gameState.campaign.gold;
+  const canUpgrade = gold >= CARD_UPGRADE_PRICE;
+  const canRemove = gold >= CARD_REMOVE_PRICE;
+  const loc = WORLD.locations[gameState.campaign.currentLocation];
+  const npc = loc && loc.npc;
+  const cleared = gameState.campaign.cleared.has(gameState.campaign.currentLocation);
   return `
     <div class="screen rest-screen">
       <h2 class="screen-title">Campfire</h2>
@@ -564,23 +590,24 @@ function renderRest() {
             <span class="rest-choice-desc">Heal ${healAmount} HP</span>
           </button>
         ` : ''}
-        <button class="rest-choice" onclick="openUpgradeSelect()">
+        <button class="rest-choice ${canUpgrade ? '' : 'rest-choice-disabled'}" onclick="${canUpgrade ? 'openUpgradeSelect()' : ''}">
           <span class="rest-choice-icon">${icon('arrow-up', 28, '#55cc55')}</span>
           <span class="rest-choice-label">Upgrade</span>
-          <span class="rest-choice-desc">Enhance a card</span>
+          <span class="rest-choice-desc">Enhance a card — ${icon('coins', 12, '#c8a96e')} ${CARD_UPGRADE_PRICE}</span>
         </button>
-        <button class="rest-choice" onclick="openRemoveSelect()">
+        <button class="rest-choice ${canRemove ? '' : 'rest-choice-disabled'}" onclick="${canRemove ? 'openRemoveSelect()' : ''}">
           <span class="rest-choice-icon">${icon('trash', 28, '#aa6666')}</span>
           <span class="rest-choice-label">Remove</span>
-          <span class="rest-choice-desc">Thin your deck</span>
+          <span class="rest-choice-desc">Thin your deck — ${icon('coins', 12, '#c8a96e')} ${CARD_REMOVE_PRICE}</span>
         </button>
       </div>
+      ${npc && !cleared ? `<button class="btn btn-secondary" onclick="enterRestNpc()" style="margin-top:8px">Talk to ${npc.name}</button>` : ''}
     </div>
   `;
 }
 
 function doRest() {
-  const healAmount = Math.min(Math.floor(gameState.player.maxHp * 0.3), gameState.player.maxHp - gameState.player.hp);
+  const healAmount = Math.min(Math.floor(gameState.player.maxHp * REST_HEAL_FRACTION), gameState.player.maxHp - gameState.player.hp);
   gameState.player.hp += healAmount;
   addLog(`Rested and healed ${healAmount} HP.`);
   if (healAmount > 0) showNotification(`+${healAmount} HP`, 'heal');
@@ -589,13 +616,25 @@ function doRest() {
   returnToMap();
 }
 
+function enterRestNpc() {
+  const loc = WORLD.locations[gameState.campaign.currentLocation];
+  if (!loc || !loc.npc) return;
+  gameState._currentNpc = { ...loc.npc, dialogue: loc.npc.dialogue };
+  gameState._npcDialogueIndex = 0;
+  gameState._returnToRest = true;
+  gameState.phase = GAME_PHASES.NPC;
+  renderGame();
+}
+
 function openUpgradeSelect() {
+  if (gameState.campaign.gold < CARD_UPGRADE_PRICE) return;
   gameState._upgradeMode = 'upgrade';
   gameState.phase = GAME_PHASES.CARD_UPGRADE;
   renderGame();
 }
 
 function openRemoveSelect() {
+  if (!gameState._returnToShop && gameState.campaign.gold < CARD_REMOVE_PRICE) return;
   gameState._upgradeMode = 'remove';
   gameState.phase = GAME_PHASES.CARD_UPGRADE;
   renderGame();
@@ -751,9 +790,13 @@ function doCardAction(index) {
       if (idx >= 0) gameState.player.discard.splice(idx, 1);
     }
     addLog(`Removed ${card.name} from deck.`);
-    if (gameState._returnToShop) {
-      gameState.campaign.gold -= CARD_REMOVE_PRICE;
+    // Tree offering: show special screen instead of charging gold
+    if (gameState._treeOffering) {
+      delete gameState._treeOffering;
+      showTreeOfferingScreen(card);
+      return;
     }
+    gameState.campaign.gold -= CARD_REMOVE_PRICE;
   } else {
     // Show upgrade preview instead of immediately upgrading
     gameState._upgradePreviewCardId = card.id;
@@ -772,6 +815,9 @@ function confirmUpgrade() {
     || gameState.player.discard.find(c => c.id === cardId)
     || gameState.player.hand.find(c => c.id === cardId);
   if (actual) {
+    if (!gameState._returnToShop) {
+      gameState.campaign.gold -= CARD_UPGRADE_PRICE;
+    }
     upgradeCard(actual);
     addLog(`Upgraded ${actual.name}!`);
   }
@@ -929,6 +975,14 @@ function doEventChoice(index) {
       showChestAnimation();
       return;
     }
+    if (choice.reward.treeOffering) {
+      gameState._treeOffering = true;
+      gameState._treeResult = choice.result;
+      gameState._upgradeMode = 'remove';
+      gameState.phase = GAME_PHASES.CARD_UPGRADE;
+      renderGame();
+      return;
+    }
     if (choice.reward.removeCard) {
       gameState._upgradeMode = 'remove';
       gameState.phase = GAME_PHASES.CARD_UPGRADE;
@@ -949,6 +1003,53 @@ function doEventChoice(index) {
 
   addLog(choice.result);
   clearLocation(gameState.campaign.currentLocation);
+  returnToMap();
+}
+
+// === TREE OFFERING ===
+
+function showTreeOfferingScreen(offeredCard) {
+  const rareCard = getRareCard();
+  gameState.player.deck.push(rareCard);
+  gameState._treeRewardCard = rareCard;
+  gameState._treeOfferedCard = offeredCard;
+
+  clearLocation(gameState.campaign.currentLocation);
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen tree-offering-screen">
+      <div class="tree-phase tree-phase-absorb" id="treePhase1">
+        <h2 class="screen-title">The Elder Tree</h2>
+        <p class="tree-narration">You hold out your card. Roots rise from the earth and wrap around it...</p>
+        <div class="tree-card-offered">
+          ${renderCard(offeredCard, -1, false)}
+        </div>
+        <p class="tree-narration">The tree shudders. The card dissolves into golden light.</p>
+        <button class="btn btn-primary" onclick="showTreeReward()">...</button>
+      </div>
+      <div class="tree-phase tree-phase-reward tree-hidden" id="treePhase2">
+        <h2 class="screen-title">The Elder Tree</h2>
+        <p class="tree-narration">${gameState._treeResult || 'A glowing seed falls into your hand — a new card forms from the wood.'}</p>
+        <div class="tree-card-reward">
+          ${renderCard(rareCard, -1, false)}
+        </div>
+        <p class="tree-narration-gained">+ ${rareCard.name}</p>
+        <button class="btn btn-primary" onclick="leaveTreeOffering()">Continue</button>
+      </div>
+    </div>
+  `;
+  delete gameState._treeResult;
+}
+
+function showTreeReward() {
+  document.getElementById('treePhase1').classList.add('tree-hidden');
+  document.getElementById('treePhase2').classList.remove('tree-hidden');
+}
+
+function leaveTreeOffering() {
+  delete gameState._treeRewardCard;
+  delete gameState._treeOfferedCard;
   returnToMap();
 }
 
@@ -1032,6 +1133,15 @@ function leaveNpc() {
       gameState.campaign.npcRewardsCollected = new Set();
     }
     gameState.campaign.npcRewardsCollected.add(locId);
+  }
+
+  // Return to rest screen if NPC was at a rest site
+  if (gameState._returnToRest) {
+    delete gameState._returnToRest;
+    clearLocation(locId);
+    gameState.phase = GAME_PHASES.REST;
+    renderGame();
+    return;
   }
 
   clearLocation(locId);

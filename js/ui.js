@@ -145,6 +145,10 @@ function confirmDeleteProfile(id) {
 
 function toggleDevMode() {
   MAP_DEBUG = !MAP_DEBUG;
+  if (MAP_DEBUG && gameState.phase === GAME_PHASES.MENU) {
+    startAIGame('fire');
+    gameState.phase = GAME_PHASES.MAP;
+  }
   renderGame();
 }
 

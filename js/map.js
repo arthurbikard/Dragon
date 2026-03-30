@@ -147,6 +147,20 @@ const WORLD = {
       paths: ['foggy_ambush', 'the_wild_shore'],
       description: 'Sheltered tidal pools steam gently in the afternoon sun. A safe place to rest and mend.',
       image: 'images/loc_wanderers_camp.png',
+      npc: {
+        name: 'Wandering Smith',
+        image: 'images/npc_elder.png',
+        icon: icon('gear', 24, '#c8a96e'),
+        dialogue: [
+          'Well met, traveler. Don\'t mind the forge — I carry it on my back.',
+          'I was once an armorer in the king\'s court. When the corruption came, I took to the road.',
+          'Now I work with stranger things than steel. I can reshape the magic woven into your cards.',
+          'Bring me a card and some coin, and I\'ll strengthen its essence. Or I can unmake one entirely, if it\'s weighing you down.',
+          'A word of advice — if you make it past the gate, seek the Elder Tree deep in the Thornwood. It holds ancient power... and a will of its own.',
+          'I\'ve heard it offers bargains to those brave enough to listen. But beware what you trade.',
+          'Rest by my fire if you need to. The bay is safe... for now.',
+        ],
+      },
     },
     the_wild_shore: {
       name: 'The Wild Shore',
@@ -281,7 +295,7 @@ const WORLD = {
       biome: 'forest',
       type: LOC_TYPES.REST,
       x: 24.5, y: 4.8,
-      paths: ['forest_heart', 'spiders_nest', 'corrupted_shrine', 'ruined_bridge'],
+      paths: ['forest_heart', 'spiders_nest', 'corrupted_shrine', 'ruined_bridge', 'elder_tree'],
       description: 'A massive stump, wide as a house, from a tree felled centuries ago. Warm moss makes a natural bed. The corruption cannot reach here.',
       image: 'images/loc_wanderers_camp.png',
     },
@@ -354,7 +368,7 @@ const EVENTS = {
     title: 'The Elder Tree',
     description: 'The ancient oak speaks in rustling leaves: "Give me something of yours, and I shall give you something of mine."',
     choices: [
-      { text: 'Offer a card to the tree', cost: null, reward: { removeCard: true }, result: 'The tree absorbs your offering. Its branches shiver, and a glowing seed falls into your hand — a new card forms from the wood.' },
+      { text: 'Offer a card to the tree', cost: null, reward: { treeOffering: true }, result: 'The tree absorbs your offering. Its branches shiver, and a glowing seed falls into your hand — a new card forms from the wood.' },
       { text: 'Ask for its blessing', cost: null, reward: { heal: 20, cardReward: true, cardCount: 2 }, result: 'Warm golden sap flows over you, healing your wounds. Leaves spiral down, carrying knowledge of forest magic.' },
       { text: 'Bow and leave', cost: null, reward: null, result: 'The tree rustles in acknowledgment. Perhaps another time.' },
     ],
@@ -391,7 +405,9 @@ const SHOP_RARE_CARDS = [
   { rareKey: 'dragons_bane', price: 18 },
 ];
 
-const CARD_REMOVE_PRICE = 12;
+const CARD_REMOVE_PRICE = 10;
+const CARD_UPGRADE_PRICE = 10;
+const REST_HEAL_FRACTION = 0.2;
 const SHOP_HEAL_PRICE = 5;
 const SHOP_HEAL_AMOUNT = 10;
 
