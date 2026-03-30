@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dragon Cards — Live Simulation Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0d5c0;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-family: 'Cinzel', serif;
+      color: #c8a96e;
+      font-size: 28px;
+      margin-bottom: 4px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(200, 169, 110, 0.3);
+    }
+    .subtitle {
+      color: #887755;
+      font-size: 14px;
+      margin-bottom: 16px;
+      font-style: italic;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 12px 20px;
+      background: rgba(200, 169, 110, 0.06);
+      border: 1px solid rgba(200, 169, 110, 0.15);
+      border-radius: 8px;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    label {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      color: #c8a96e;
+    }
+    input[type="number"] {
+      width: 60px;
+      padding: 4px 8px;
+      background: #1a1a2e;
+      border: 1px solid #c8a96e44;
+      color: #e0d5c0;
+      border-radius: 4px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px;
+      text-align: center;
+    }
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #c8a96e;
+    }
+    .checkbox-group {
+      display: flex;
+      gap: 12px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .checkbox-label input[type="checkbox"] {
+      accent-color: #c8a96e;
+    }
+    .color-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    button {
+      padding: 6px 20px;
+      background: linear-gradient(135deg, #c8a96e, #a08040);
+      border: none;
+      color: #0a0a0f;
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #ddbf80, #b89050);
+      transform: translateY(-1px);
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+    button.clear-btn {
+      background: linear-gradient(135deg, #555, #333);
+      color: #aaa;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    button.clear-btn:hover {
+      background: linear-gradient(135deg, #666, #444);
+      color: #ccc;
+    }
+    .canvas-container {
+      position: relative;
+      border: 1px solid rgba(200, 169, 110, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d0d15;
+    }
+    canvas {
+      display: block;
+    }
+    .legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: rgba(200, 169, 110, 0.06);
+      border: 1px solid rgba(200, 169, 110, 0.1);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-line {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+    }
+    .status-bar {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #887755;
+      min-height: 18px;
+    }
+    .status-bar .running { color: #c8a96e; }
+    .status-bar .done { color: #6a6; }
+    .marker-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #887755;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Dragon Cards Live Simulation</h1>
+  <p class="subtitle">Progression vs Deck Strength — color shows HP status</p>
+
+  <div class="controls">
+    <div class="control-group">
+      <label for="numRuns">Runs:</label>
+      <input type="number" id="numRuns" value="20" min="1" max="500">
+    </div>
+    <div class="control-group">
+      <label>Agents:</label>
+      <div class="checkbox-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="agentRandom" checked>
+          <span class="color-dot" style="background: #888;"></span> Random
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="agentExplorer" checked>
+          <span class="color-dot" style="background: #4488dd;"></span> Explorer
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="agentOptimal" checked>
+          <span class="color-dot" style="background: #c8a96e;"></span> Optimal
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="agentLookahead">
+          <span class="color-dot" style="background: #cc55cc;"></span> Lookahead
+        </label>
+      </div>
+    </div>
+    <button id="runBtn" onclick="startSimulation()">Run</button>
+    <button class="clear-btn" onclick="clearCanvas()">Clear</button>
+  </div>
+
+  <div class="canvas-container">
+    <canvas id="chart" width="900" height="520"></canvas>
+  </div>
+
+  <div class="legend" id="legend"></div>
+  <div class="marker-legend">
+    <span style="color:#e04040;">&#10006; = Death</span>
+    <span style="color:#40c040;">&#9733; = Victory</span>
+    <span>Color: <span style="color:#28c828;">■</span> healthy → <span style="color:#dcdc28;">■</span> mid → <span style="color:#dc2828;">■</span> low HP</span>
+  </div>
+  <div class="status-bar" id="status"></div>
+
+  <!-- Stub globals BEFORE loading game files -->
+  <script>
+    const GAME_VERSION = '0.0.0';
+    // Prevent the game from rendering anything
+    function renderGame() {}
+    function showNotification() {}
+    function renderWorldPaths() {}
+    function scrollToCurrentLocation() {}
+    function initDragListeners() {}
+
+    // Track whether simulation is running so we can make setTimeout synchronous
+    var _simRunning = false;
+    var _origSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = function(fn, delay) {
+      if (_simRunning && typeof fn === 'function') {
+        // Execute immediately during simulation (same as Node.js simulator)
+        fn();
+        return 0;
+      }
+      return _origSetTimeout(fn, delay);
+    };
+  </script>
+
+  <!-- Load game source files in order -->
+  <script src="js/icons.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/quests.js"></script>
+  <script src="js/game.js"></script>
+  <!-- We load ui.js and map-ui.js because the simulation calls functions defined there -->
+  <script src="js/ui.js"></script>
+  <script src="js/map-ui.js"></script>
+
+  <!-- Re-stub after loading (ui/map-ui may overwrite renderGame) -->
+  <script>
+    renderGame = function() {};
+    showNotification = function() {};
+  </script>
+
+  <script>
+  // ============================================================
+  //  SIMULATION ENGINE (browser-adapted from simulate.js)
+  // ============================================================
+
+  // --- Deck Strength Scoring ---
+  function scoreDeck(player) {
+    const allCards = [...player.deck, ...player.discard, ...player.hand];
+    if (allCards.length === 0) return 0;
+
+    let totalValue = 0;
+    for (const card of allCards) {
+      let cardValue = 0;
+      cardValue += (card.damage || 0) * 1.0;
+      cardValue += (card.block || 0) * 0.8;
+      for (const fx of (card.effects || [])) {
+        const dur = fx.duration || 1;
+        switch (fx.type) {
+          case 'burn':       cardValue += fx.value * dur * 1.5; break;
+          case 'heal':       cardValue += fx.value * 1.8; break;
+          case 'draw':       cardValue += fx.value * 3.0; break;
+          case 'gainEnergy': cardValue += fx.value * 4.0; break;
+          case 'thorns':     cardValue += fx.value * dur * 1.2; break;
+          case 'vulnerable': cardValue += dur * 3.0; break;
+          case 'weak':       cardValue += dur * 2.5; break;
+          case 'cleanse':    cardValue += 3.0; break;
+          default:           cardValue += 1.5; break;
+        }
+      }
+      const cost = card.cost || 1;
+      if (cost > 0 && card.damage > 0) cardValue += (card.damage / cost) * 0.5;
+      if (card.upgraded) cardValue *= 1.25;
+      const rarity = card.rarity || 'common';
+      if (rarity === 'uncommon') cardValue *= 1.1;
+      else if (rarity === 'rare') cardValue *= 1.3;
+      else if (rarity === 'legendary') cardValue *= 1.5;
+      totalValue += cardValue;
+    }
+
+    const avgQuality = totalValue / allCards.length;
+    const idealSize = 11;
+    const sizePenalty = Math.max(0, (allCards.length - idealSize) * 0.8);
+    let score = avgQuality * 7 - sizePenalty;
+    return Math.max(0, Math.min(100, score));
+  }
+
+  // --- Agent Definitions (mirrored from simulate.js) ---
+  const SIM_AGENTS = {
+    random: {
+      name: 'Random',
+      color: '#888888',
+      pickCard(hand, energy, actor, opponent) {
+        const playable = hand.filter(c => c.cost <= energy);
+        if (playable.length === 0) return null;
+        return playable[Math.floor(Math.random() * playable.length)];
+      },
+      pickMapAction() { return 'random'; },
+      pickReward(cards) {
+        if (Math.random() < 0.5) return Math.floor(Math.random() * cards.length);
+        return -1;
+      },
+      pickEventChoice(choices) {
+        return Math.floor(Math.random() * choices.length);
+      },
+      pickShopCard(items, gold) { return -1; },
+      shouldRest(player) { return Math.random() < 0.5; },
+    },
+
+    explorer: {
+      name: 'Explorer',
+      color: '#4488dd',
+      pickCard(hand, energy, actor, opponent) {
+        // Reuse optimal's combat logic
+        return SIM_AGENTS.optimal.pickCard(hand, energy, actor, opponent);
+      },
+      pickMapAction() { return 'explore'; },
+      pickReward(cards) {
+        let best = 0, bestScore = -1;
+        cards.forEach((c, i) => {
+          const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
+            if (e.type === 'burn') return s + e.value * 2;
+            if (e.type === 'heal') return s + e.value * 1.5;
+            if (e.type === 'draw') return s + e.value * 3;
+            if (e.type === 'gainEnergy') return s + e.value * 4;
+            return s + 2;
+          }, 0);
+          if (score > bestScore) { bestScore = score; best = i; }
+        });
+        return best;
+      },
+      pickEventChoice(choices) {
+        return choices.findIndex(c => c.reward) >= 0 ? choices.findIndex(c => c.reward) : 0;
+      },
+      pickShopCard(items, gold) {
+        const affordable = items.filter(i => i.price <= gold);
+        if (affordable.length === 0) return -1;
+        let best = affordable[0], bestVal = 0;
+        affordable.forEach(i => {
+          const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+          if (val > bestVal) { bestVal = val; best = i; }
+        });
+        return items.indexOf(best);
+      },
+      shouldRest(player) { return player.hp < player.maxHp * 0.6; },
+    },
+
+    optimal: {
+      name: 'Optimal',
+      color: '#c8a96e',
+      _route: [
+        'whispering_cliffs', 'misthaven_village', 'shore_market', 'veiled_sea',
+        'windward_lighthouse', 'veiled_sea', 'foggy_ambush', 'reef_shallows',
+        'the_wild_shore', 'thornwood_gate', 'misthaven_village', 'thornwood_gate',
+        'spring_of_tides', 'forest_edge', 'hermits_hut', 'woodcutters_camp',
+        'mushroom_grove', 'woodcutters_camp', 'ruined_bridge', 'ancient_stump',
+        'elder_tree', 'ancient_stump', 'corrupted_shrine', 'forest_heart',
+      ],
+      _routeIndex: 0,
+      pickCard(hand, energy, actor, opponent) {
+        const playable = hand.filter(c => c.cost <= energy);
+        if (playable.length === 0) return null;
+        const hpRatio = actor.hp / actor.maxHp;
+        const intent = opponent.nextIntent;
+        const enemyAttacking = intent && (intent.type === 'attack' || intent.type === 'heavy_attack');
+        const incomingDamage = enemyAttacking ? (intent.damage || 0) : 0;
+        const needsBlock = incomingDamage > actor.block;
+        if (needsBlock && incomingDamage > 10) {
+          const blockers = playable.filter(c => c.block > 0);
+          if (blockers.length > 0) return blockers.reduce((a, b) => a.block > b.block ? a : b);
+        }
+        if (hpRatio < 0.35) {
+          const healers = playable.filter(c => c.effects.some(e => e.type === 'heal'));
+          if (healers.length > 0) return healers[0];
+        }
+        const free = playable.filter(c => c.cost === 0);
+        if (free.length > 0) return free[0];
+        if (playable.length > 2) {
+          const energyGain = playable.filter(c => c.effects.some(e => e.type === 'gainEnergy'));
+          if (energyGain.length > 0) return energyGain[0];
+        }
+        const attacks = playable.filter(c => c.damage > 0);
+        if (attacks.length > 0) return attacks.reduce((a, b) => (a.damage / a.cost) > (b.damage / b.cost) ? a : b);
+        if (needsBlock) {
+          const blockers = playable.filter(c => c.block > 0);
+          if (blockers.length > 0) return blockers.reduce((a, b) => a.block > b.block ? a : b);
+        }
+        const drawers = playable.filter(c => c.effects.some(e => e.type === 'draw'));
+        if (drawers.length > 0) return drawers[0];
+        return playable[0];
+      },
+      pickMapAction() { return 'scripted'; },
+      pickReward(cards) {
+        let best = 0, bestScore = -1;
+        cards.forEach((c, i) => {
+          const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
+            if (e.type === 'burn') return s + e.value * 2;
+            if (e.type === 'heal') return s + e.value * 1.5;
+            if (e.type === 'draw') return s + e.value * 3;
+            if (e.type === 'gainEnergy') return s + e.value * 4;
+            return s + 2;
+          }, 0);
+          if (score > bestScore) { bestScore = score; best = i; }
+        });
+        return best;
+      },
+      pickEventChoice(choices) {
+        return choices.findIndex(c => c.reward) >= 0 ? choices.findIndex(c => c.reward) : 0;
+      },
+      pickShopCard(items, gold) {
+        const affordable = items.filter(i => i.price <= gold);
+        if (affordable.length === 0) return -1;
+        let best = affordable[0], bestVal = 0;
+        affordable.forEach(i => {
+          const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+          if (val > bestVal) { bestVal = val; best = i; }
+        });
+        return items.indexOf(best);
+      },
+      shouldRest(player) { return player.hp < player.maxHp * 0.7; },
+    },
+
+    lookahead: {
+      name: 'Lookahead',
+      color: '#cc55cc',
+      _route: [
+        'whispering_cliffs', 'misthaven_village', 'shore_market', 'veiled_sea',
+        'windward_lighthouse', 'veiled_sea', 'foggy_ambush', 'reef_shallows',
+        'the_wild_shore', 'thornwood_gate', 'misthaven_village', 'thornwood_gate',
+        'spring_of_tides', 'forest_edge', 'hermits_hut', 'woodcutters_camp',
+        'mushroom_grove', 'woodcutters_camp', 'ruined_bridge', 'ancient_stump',
+        'elder_tree', 'ancient_stump', 'corrupted_shrine', 'forest_heart',
+      ],
+      _routeIndex: 0,
+      // In browser, use optimal's combat (real lookahead is too slow for live viz)
+      pickCard: null, // wired below
+      pickMapAction() { return 'scripted'; },
+      pickReward(cards) {
+        let best = 0, bestScore = -1;
+        cards.forEach((c, i) => {
+          const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
+            if (e.type === 'burn') return s + e.value * 2;
+            if (e.type === 'heal') return s + e.value * 1.5;
+            if (e.type === 'draw') return s + e.value * 3;
+            if (e.type === 'gainEnergy') return s + e.value * 4;
+            return s + 2;
+          }, 0);
+          if (score > bestScore) { bestScore = score; best = i; }
+        });
+        return best;
+      },
+      pickEventChoice(choices) {
+        return choices.findIndex(c => c.reward) >= 0 ? choices.findIndex(c => c.reward) : 0;
+      },
+      pickShopCard(items, gold) {
+        const affordable = items.filter(i => i.price <= gold);
+        if (affordable.length === 0) return -1;
+        let best = affordable[0], bestVal = 0;
+        affordable.forEach(i => {
+          const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+          if (val > bestVal) { bestVal = val; best = i; }
+        });
+        return items.indexOf(best);
+      },
+      shouldRest(player) { return player.hp < player.maxHp * 0.7; },
+    },
+  };
+
+  // Wire lookahead's combat to optimal's
+  SIM_AGENTS.lookahead.pickCard = SIM_AGENTS.optimal.pickCard;
+
+  // --- Simulation helpers (mirrors simulate.js logic) ---
+
+  let _simVisitedBrowser = new Set();
+
+  function pickDestinationBrowser(agent, connections) {
+    if (connections.length === 0) return null;
+    if (connections.length === 1) return connections[0];
+
+    const campaign = gameState.campaign;
+    const hpRatio = gameState.player.hp / gameState.player.maxHp;
+
+    if (agent.name === 'Random') {
+      return connections[Math.floor(Math.random() * connections.length)];
+    }
+
+    if (agent.name === 'Explorer') {
+      const unvisited = connections.filter(id => !campaign.visited.has(id));
+      if (unvisited.length > 0) return unvisited[Math.floor(Math.random() * unvisited.length)];
+      const uncleared = connections.filter(id => !campaign.cleared.has(id));
+      if (uncleared.length > 0) return uncleared[Math.floor(Math.random() * uncleared.length)];
+      return connections[Math.floor(Math.random() * connections.length)];
+    }
+
+    if ((agent.name === 'Optimal' || agent.name === 'Lookahead') && agent._route) {
+      while (agent._routeIndex < agent._route.length) {
+        const target = agent._route[agent._routeIndex];
+        if (connections.includes(target)) {
+          agent._routeIndex++;
+          return target;
+        }
+        const targetLoc = WORLD.locations[target];
+        if (targetLoc) {
+          let bestConn = null, bestDist = Infinity;
+          for (const connId of connections) {
+            const connLoc = WORLD.locations[connId];
+            if (!connLoc) continue;
+            const dx = connLoc.x - targetLoc.x, dy = connLoc.y - targetLoc.y;
+            const dist = dx * dx + dy * dy;
+            if (dist < bestDist) { bestDist = dist; bestConn = connId; }
+          }
+          if (bestConn) return bestConn;
+        }
+        agent._routeIndex++;
+      }
+    }
+
+    // Scored fallback
+    const scored = connections.map(id => {
+      const loc = WORLD.locations[id];
+      if (!loc) return { id, score: -100 };
+      let score = 0;
+      const cleared = campaign.cleared.has(id);
+      if (!cleared) score += 20; else score -= 10;
+      if (loc.type === LOC_TYPES.REST && hpRatio < 0.6 && typeof canRest === 'function' && canRest()) score += 15;
+      if (loc.type === LOC_TYPES.SHOP && campaign.gold >= 8) score += 10;
+      if (loc.type === LOC_TYPES.ELITE && !cleared && hpRatio > 0.5) score += 25;
+      if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.4) score -= 10;
+      if (loc.type === LOC_TYPES.MINI_BOSS || loc.type === LOC_TYPES.BOSS) {
+        const eliteCleared = Object.entries(WORLD.locations).some(([eid, l]) => l.type === LOC_TYPES.ELITE && campaign.cleared.has(eid));
+        if (eliteCleared && hpRatio > 0.5) score += 15;
+        else if (!eliteCleared) score -= 20;
+        else score -= 5;
+      }
+      if (loc.type === LOC_TYPES.EVENT && !cleared) score += 8;
+      if (id === 'elder_tree' && !cleared) score += 20;
+      if (_simVisitedBrowser.has(id)) score -= 15;
+      return { id, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    _simVisitedBrowser.add(scored[0].id);
+    return scored[0].id;
+  }
+
+  function simulateMapTurnBrowser(agent, stats) {
+    const campaign = gameState.campaign;
+    const currentId = campaign.currentLocation;
+    const currentLoc = WORLD.locations[currentId];
+    if (!currentLoc) { stats.error = 'Invalid location: ' + currentId; return; }
+
+    const isCleared = campaign.cleared.has(currentId);
+
+    if (!isCleared) {
+      const type = currentLoc.type;
+
+      if ([LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(type)) {
+        gameState._battleLocationId = currentId;
+        if (currentLoc.blessing) gameState._miniBossBlessing = currentLoc.blessing;
+        if (type === LOC_TYPES.ELITE) {
+          startEliteBattle(currentLoc.enemy, currentLoc.goldReward || 0);
+        } else {
+          startNodeBattle(currentLoc.enemy, currentLoc.goldReward || 0);
+        }
+        stats.battlesFought++;
+        return;
+      }
+
+      if (type === LOC_TYPES.REST) {
+        if (typeof canRest === 'function' && !canRest()) {
+          clearLocation(currentId);
+          return;
+        }
+        const hpRatio = gameState.player.hp / gameState.player.maxHp;
+        const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+        const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+        if (hpRatio < 0.5) {
+          doRest();
+        } else if (hasFiller) {
+          gameState._upgradeMode = 'remove';
+          gameState.phase = GAME_PHASES.CARD_UPGRADE;
+        } else if (hpRatio < 0.7) {
+          doRest();
+        } else {
+          const hasUpgradeable = allCards.some(c => !c.upgraded);
+          if (hasUpgradeable) {
+            gameState._upgradeMode = 'upgrade';
+            gameState.phase = GAME_PHASES.CARD_UPGRADE;
+          } else {
+            doRest();
+          }
+        }
+        return;
+      }
+
+      if (type === LOC_TYPES.SHOP) {
+        gameState._shopCards = getAvailableShopCards();
+        gameState.phase = GAME_PHASES.SHOP;
+        return;
+      }
+
+      if (type === LOC_TYPES.EVENT) {
+        if (currentLoc.eventKey && typeof EVENTS !== 'undefined' && EVENTS[currentLoc.eventKey]) {
+          gameState._currentEvent = currentLoc.eventKey;
+          gameState.phase = GAME_PHASES.EVENT;
+        } else {
+          clearLocation(currentId);
+        }
+        return;
+      }
+
+      if (type === LOC_TYPES.NPC) {
+        clearLocation(currentId);
+        return;
+      }
+
+      if (type === LOC_TYPES.TREASURE) {
+        if (typeof openTreasure === 'function') openTreasure(currentId);
+        else clearLocation(currentId);
+        return;
+      }
+
+      clearLocation(currentId);
+      return;
+    }
+
+    // Navigate
+    const connections = (currentLoc.paths || []).filter(id => typeof canTravelTo === 'function' ? canTravelTo(id) : true);
+    if (connections.length === 0) {
+      stats.error = 'Stuck at ' + currentId;
+      return;
+    }
+    const dest = pickDestinationBrowser(agent, connections);
+    if (!dest) { stats.error = 'No destination from ' + currentId; return; }
+    travelTo(dest);
+  }
+
+  function simulateBattleTurnBrowser(agent, stats) {
+    const MAX_BATTLE_TURNS = 100;
+    let turns = 0;
+
+    while (gameState.phase === GAME_PHASES.BATTLE && turns < MAX_BATTLE_TURNS) {
+      if (gameState.currentTurn === 'player') {
+        turns++;
+        stats.totalTurns++;
+        let cardsThisTurn = 0;
+        const MAX_CARDS_PER_TURN = 20;
+        while (cardsThisTurn < MAX_CARDS_PER_TURN && gameState.phase === GAME_PHASES.BATTLE) {
+          const actor = gameState.player;
+          const opponent = gameState.enemy;
+          const card = agent.pickCard(actor.hand, actor.energy, actor, opponent);
+          if (!card) break;
+          const index = actor.hand.indexOf(card);
+          if (index < 0) break;
+          gameState.selectedCardIndex = index;
+          playCard(index);
+          cardsThisTurn++;
+          stats.totalCardsPlayed++;
+          if (gameState.phase !== GAME_PHASES.BATTLE) return;
+        }
+        if (gameState.phase === GAME_PHASES.BATTLE) endTurn();
+      } else {
+        if (gameState.currentTurn === 'enemy' && gameState.phase === GAME_PHASES.BATTLE) endTurn();
+      }
+    }
+
+    if (turns >= MAX_BATTLE_TURNS) stats.error = 'Battle exceeded ' + MAX_BATTLE_TURNS + ' turns';
+    if (gameState.phase === GAME_PHASES.BATTLE) stats.error = stats.error || 'Battle did not resolve';
+    if (gameState.enemy && gameState.enemy.hp <= 0) stats.battlesWon++;
+  }
+
+  // --- Run one complete game, yielding after each action ---
+
+  function* simulateGameGenerator(agent, element) {
+    const stats = {
+      agent: agent.name, element, won: false, diedAt: null,
+      locationsVisited: 0, battlesWon: 0, battlesFought: 0,
+      totalTurns: 0, totalCardsPlayed: 0, finalHp: 0,
+      goldEarned: 0, goldSpent: 0, error: null, totalActions: 0,
+      trace: [],
+    };
+
+    const MAX_ACTIONS = 5000;
+
+    try {
+      _simRunning = true;
+      gameState = createGameState();
+      gameState.mode = GAME_MODES.AI;
+      gameState.player = createPlayerState(element, STARTING_HP);
+      gameState.campaign = createCampaignState();
+      gameState.phase = GAME_PHASES.MAP;
+      _simVisitedBrowser = new Set();
+      if (agent._route) agent._routeIndex = 0;
+
+      let actions = 0;
+
+      while (actions < MAX_ACTIONS) {
+        actions++;
+        stats.totalActions = actions;
+
+        if (gameState.phase === GAME_PHASES.VICTORY) {
+          stats.won = true;
+          stats.finalHp = gameState.player.hp;
+          break;
+        }
+        if (gameState.phase === GAME_PHASES.GAME_OVER) {
+          stats.diedAt = gameState._battleLocationId || 'unknown';
+          stats.finalHp = 0;
+          break;
+        }
+
+        if (gameState.phase === GAME_PHASES.MAP) {
+          try {
+            simulateMapTurnBrowser(agent, stats);
+          } catch (e) {
+            stats.error = 'Map error: ' + e.message;
+            break;
+          }
+          stats.trace.push({
+            hp: gameState.player.hp,
+            maxHp: gameState.player.maxHp,
+            deckScore: scoreDeck(gameState.player),
+            nodesExplored: gameState.campaign ? gameState.campaign.explored.size : 0,
+            location: gameState.campaign ? gameState.campaign.currentLocation : 'unknown',
+            action: actions,
+          });
+          yield { stats, done: false };
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.BATTLE) {
+          simulateBattleTurnBrowser(agent, stats);
+          stats.trace.push({
+            hp: gameState.player.hp,
+            maxHp: gameState.player.maxHp,
+            deckScore: scoreDeck(gameState.player),
+            location: gameState.campaign ? gameState.campaign.currentLocation : 'unknown',
+            action: actions,
+          });
+          yield { stats, done: false };
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.CARD_REWARD) {
+          const cards = gameState._rewardCards || [];
+          if (cards.length > 0) {
+            const pick = agent.pickReward(cards);
+            if (pick >= 0 && pick < cards.length) pickRewardCard(pick);
+            else skipReward();
+          } else {
+            skipReward();
+          }
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.SHOP) {
+          const gold = gameState.campaign.gold;
+          if (gameState.player.hp < gameState.player.maxHp * 0.6 && gold >= SHOP_HEAL_PRICE) {
+            buyHeal(); continue;
+          }
+          const allCards2 = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+          const hasFiller2 = allCards2.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+          if (hasFiller2 && gold >= CARD_REMOVE_PRICE) {
+            openShopRemove(); continue;
+          }
+          const items = gameState._shopCards || [];
+          const pick = agent.pickShopCard(items, gold);
+          if (pick >= 0) {
+            const before = gameState.campaign.gold;
+            buyCard(pick);
+            stats.goldSpent += before - gameState.campaign.gold;
+            continue;
+          }
+          leaveShop();
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.REST) {
+          if (typeof canRest === 'function' && !canRest()) {
+            clearLocation(gameState.campaign.currentLocation);
+            if (typeof returnToMap === 'function') returnToMap();
+            continue;
+          }
+          const hpRatio = gameState.player.hp / gameState.player.maxHp;
+          const allCards3 = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+          const hasUpgradeable = allCards3.some(c => !c.upgraded);
+          const deckSize = gameState.player.deck.length + gameState.player.discard.length;
+          if (hpRatio < 0.5) {
+            doRest();
+          } else if (deckSize > 10 && hpRatio > 0.5) {
+            gameState._upgradeMode = 'remove';
+            gameState.phase = GAME_PHASES.CARD_UPGRADE;
+          } else if (hasUpgradeable && hpRatio > 0.7) {
+            gameState._upgradeMode = 'upgrade';
+            gameState.phase = GAME_PHASES.CARD_UPGRADE;
+          } else {
+            doRest();
+          }
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.NPC) {
+          if (typeof leaveNpc === 'function') leaveNpc();
+          else if (typeof returnToMap === 'function') returnToMap();
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.EVENT) {
+          const eventId = gameState._currentEvent;
+          const event = (typeof EVENTS !== 'undefined') ? EVENTS[eventId] : null;
+          if (event) {
+            const choice = agent.pickEventChoice(event.choices);
+            doEventChoice(choice);
+            if (gameState.phase === GAME_PHASES.EVENT && gameState._rewardCards) {
+              gameState.phase = GAME_PHASES.CARD_REWARD;
+            }
+          } else {
+            if (typeof advanceAfterNode === 'function') advanceAfterNode();
+            else if (typeof returnToMap === 'function') returnToMap();
+          }
+          continue;
+        }
+
+        if (gameState.phase === GAME_PHASES.CARD_UPGRADE) {
+          if (gameState._upgradePreviewCardId) {
+            if (typeof confirmUpgrade === 'function') confirmUpgrade();
+            continue;
+          }
+          const mode = gameState._upgradeMode || 'upgrade';
+          const allCards4 = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+          const cards4 = mode === 'upgrade' ? allCards4.filter(c => !c.upgraded) : allCards4;
+          if (cards4.length === 0) {
+            if (typeof returnFromUpgrade === 'function') returnFromUpgrade();
+            continue;
+          }
+          if (mode === 'upgrade' && !gameState._returnToShop && gameState.campaign.gold < CARD_UPGRADE_PRICE) {
+            if (typeof returnFromUpgrade === 'function') returnFromUpgrade();
+            continue;
+          }
+          if (mode === 'remove' && !gameState._returnToShop && gameState.campaign.gold < CARD_REMOVE_PRICE) {
+            if (typeof returnFromUpgrade === 'function') returnFromUpgrade();
+            continue;
+          }
+          if (mode === 'remove') {
+            let weakIdx = 0, weakScore = Infinity;
+            cards4.forEach((c, i) => {
+              const s = c.damage + c.block + c.effects.length * 3;
+              if (s < weakScore) { weakScore = s; weakIdx = i; }
+            });
+            if (typeof doCardAction === 'function') doCardAction(weakIdx);
+          } else {
+            let bestIdx = 0, bestScore2 = -1;
+            cards4.forEach((c, i) => {
+              const s = c.damage * 2 + c.block * 1.5 + c.effects.length * 3;
+              if (s > bestScore2) { bestScore2 = s; bestIdx = i; }
+            });
+            if (typeof doCardAction === 'function') doCardAction(bestIdx);
+          }
+          continue;
+        }
+
+        if (gameState.phase === 'mini_boss_victory') {
+          if (typeof continueAfterMiniBoss === 'function') continueAfterMiniBoss();
+          continue;
+        }
+
+        if (gameState._treeOffering) {
+          delete gameState._treeOffering;
+          delete gameState._treeResult;
+          if (typeof getRareCard === 'function') {
+            const rareCard = getRareCard();
+            gameState.player.deck.push(rareCard);
+          }
+          clearLocation(gameState.campaign.currentLocation);
+          if (typeof returnToMap === 'function') returnToMap();
+          continue;
+        }
+
+        // Unknown phase fallback
+        if (typeof returnToMap === 'function') {
+          try { returnToMap(); } catch (e) {
+            stats.error = 'Unhandled phase: ' + gameState.phase;
+            break;
+          }
+        } else {
+          stats.error = 'Stuck in unknown phase: ' + gameState.phase;
+          break;
+        }
+      }
+
+      if (actions >= MAX_ACTIONS) stats.error = 'Hit action limit';
+      stats.goldEarned = gameState.campaign ? gameState.campaign.gold + stats.goldSpent : 0;
+      stats.locationsVisited = gameState.campaign ? gameState.campaign.visited.size : 0;
+
+    } catch (e) {
+      stats.error = e.message + ' (action ' + stats.totalActions + ')';
+    }
+
+    _simRunning = false;
+    yield { stats, done: true };
+  }
+
+  // ============================================================
+  //  CHART RENDERING
+  // ============================================================
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+
+  // Chart margins
+  const MARGIN = { top: 20, right: 20, bottom: 50, left: 55 };
+  const PLOT_W = canvas.width - MARGIN.left - MARGIN.right;
+  const PLOT_H = canvas.height - MARGIN.top - MARGIN.bottom;
+
+  // Axis ranges: X = nodes explored, Y = deck strength
+  const X_MIN = 0, X_MAX = 25;
+  const Y_MIN = 0, Y_MAX = 100;
+
+  function toCanvasX(nodesExplored) {
+    return MARGIN.left + (nodesExplored - X_MIN) / (X_MAX - X_MIN) * PLOT_W;
+  }
+  function toCanvasY(deckScore) {
+    return MARGIN.top + PLOT_H - (deckScore - Y_MIN) / (Y_MAX - Y_MIN) * PLOT_H;
+  }
+
+  // HP ratio → color: green (healthy) → yellow → red (dying)
+  function hpColor(hp, maxHp, alpha) {
+    const ratio = Math.max(0, Math.min(1, hp / (maxHp || 1)));
+    const r = Math.round(ratio < 0.5 ? 220 : 220 - (ratio - 0.5) * 2 * 180);
+    const g = Math.round(ratio < 0.5 ? ratio * 2 * 200 : 200);
+    const b = Math.round(40);
+    return `rgba(${r},${g},${b},${alpha || 1})`;
+  }
+
+  // Persistent traces for overlay
+  let allTraces = [];
+
+  function drawBackground() {
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(200, 169, 110, 0.08)';
+    ctx.lineWidth = 1;
+
+    // Vertical grid (nodes explored)
+    for (let x = 0; x <= X_MAX; x += 5) {
+      const cx = toCanvasX(x);
+      ctx.beginPath();
+      ctx.moveTo(cx, MARGIN.top);
+      ctx.lineTo(cx, MARGIN.top + PLOT_H);
+      ctx.stroke();
+    }
+
+    // Horizontal grid (deck strength)
+    for (let y = 0; y <= Y_MAX; y += 10) {
+      const cy = toCanvasY(y);
+      ctx.beginPath();
+      ctx.moveTo(MARGIN.left, cy);
+      ctx.lineTo(MARGIN.left + PLOT_W, cy);
+      ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(200, 169, 110, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(MARGIN.left, MARGIN.top);
+    ctx.lineTo(MARGIN.left, MARGIN.top + PLOT_H);
+    ctx.lineTo(MARGIN.left + PLOT_W, MARGIN.top + PLOT_H);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = '#c8a96e';
+    ctx.font = '13px Cinzel, serif';
+    ctx.textAlign = 'center';
+
+    // X axis tick labels
+    for (let x = 0; x <= X_MAX; x += 5) {
+      ctx.fillText(x, toCanvasX(x), MARGIN.top + PLOT_H + 20);
+    }
+    // X axis title
+    ctx.font = '14px Cinzel, serif';
+    ctx.fillText('Nodes Explored', MARGIN.left + PLOT_W / 2, canvas.height - 8);
+
+    // Y axis tick labels
+    ctx.font = '13px Cinzel, serif';
+    ctx.textAlign = 'right';
+    for (let y = 0; y <= Y_MAX; y += 10) {
+      ctx.fillText(y, MARGIN.left - 8, toCanvasY(y) + 4);
+    }
+
+    // Y axis title (rotated)
+    ctx.save();
+    ctx.translate(14, MARGIN.top + PLOT_H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.font = '14px Cinzel, serif';
+    ctx.fillText('Deck Strength', 0, 0);
+    ctx.restore();
+  }
+
+  function drawAllTraces() {
+    drawBackground();
+    for (const trace of allTraces) {
+      drawTrace(trace.points, trace.color, trace.outcome);
+    }
+  }
+
+  function drawTrace(points, agentColor, outcome) {
+    if (points.length === 0) return;
+
+    // Draw connecting line segments, colored by HP
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i < points.length; i++) {
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      ctx.strokeStyle = hpColor(p1.hp, p1.maxHp, 0.4);
+      ctx.beginPath();
+      ctx.moveTo(toCanvasX(p0.nodesExplored || 0), toCanvasY(p0.deckScore));
+      ctx.lineTo(toCanvasX(p1.nodesExplored || 0), toCanvasY(p1.deckScore));
+      ctx.stroke();
+    }
+
+    // Draw dots colored by HP
+    for (const p of points) {
+      const cx = toCanvasX(p.nodesExplored || 0);
+      const cy = toCanvasY(p.deckScore);
+      ctx.fillStyle = hpColor(p.hp, p.maxHp, 0.6);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw endpoint marker with agent color outline
+    if (points.length > 0) {
+      const last = points[points.length - 1];
+      const ex = toCanvasX(last.nodesExplored || 0);
+      const ey = toCanvasY(last.deckScore);
+
+      if (outcome === 'death') {
+        ctx.strokeStyle = '#e04040';
+        ctx.lineWidth = 2.5;
+        const s = 5;
+        ctx.beginPath();
+        ctx.moveTo(ex - s, ey - s); ctx.lineTo(ex + s, ey + s);
+        ctx.moveTo(ex + s, ey - s); ctx.lineTo(ex - s, ey + s);
+        ctx.stroke();
+      } else if (outcome === 'victory') {
+        drawStar(ex, ey, 5, 7, 3, '#40c040');
+      }
+
+      // Small agent-colored ring around endpoint
+      ctx.strokeStyle = agentColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  function drawStar(cx, cy, spikes, outerR, innerR, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    let rot = -Math.PI / 2;
+    for (let i = 0; i < spikes; i++) {
+      const outerAngle = rot + (i * 2 * Math.PI / spikes);
+      const innerAngle = outerAngle + Math.PI / spikes;
+      if (i === 0) ctx.moveTo(cx + Math.cos(outerAngle) * outerR, cy + Math.sin(outerAngle) * outerR);
+      else ctx.lineTo(cx + Math.cos(outerAngle) * outerR, cy + Math.sin(outerAngle) * outerR);
+      ctx.lineTo(cx + Math.cos(innerAngle) * innerR, cy + Math.sin(innerAngle) * innerR);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ============================================================
+  //  SIMULATION RUNNER
+  // ============================================================
+
+  let isRunning = false;
+  let totalCompleted = 0;
+  let totalPlanned = 0;
+  let winCounts = {};
+  let runCounts = {};
+
+  function updateLegend() {
+    const legendEl = document.getElementById('legend');
+    const items = [];
+    for (const [key, agent] of Object.entries(SIM_AGENTS)) {
+      if (runCounts[key]) {
+        const wins = winCounts[key] || 0;
+        const total = runCounts[key];
+        const pct = (wins / total * 100).toFixed(1);
+        items.push(
+          `<div class="legend-item">
+            <span class="legend-line" style="background: ${agent.color};"></span>
+            <span>${agent.name}: ${wins}/${total} wins (${pct}%)</span>
+          </div>`
+        );
+      }
+    }
+    legendEl.innerHTML = items.join('');
+  }
+
+  function updateStatus(msg, cls) {
+    const el = document.getElementById('status');
+    el.innerHTML = `<span class="${cls || ''}">${msg}</span>`;
+  }
+
+  async function startSimulation() {
+    if (isRunning) return;
+    isRunning = true;
+
+    const numRuns = parseInt(document.getElementById('numRuns').value) || 20;
+    const agents = [];
+    if (document.getElementById('agentRandom').checked) agents.push('random');
+    if (document.getElementById('agentExplorer').checked) agents.push('explorer');
+    if (document.getElementById('agentOptimal').checked) agents.push('optimal');
+    if (document.getElementById('agentLookahead').checked) agents.push('lookahead');
+
+    if (agents.length === 0) {
+      updateStatus('Select at least one agent.', '');
+      isRunning = false;
+      return;
+    }
+
+    document.getElementById('runBtn').disabled = true;
+    const elements = ['fire', 'water', 'earth', 'air'];
+    totalPlanned = agents.length * numRuns;
+    totalCompleted = 0;
+
+    // Build job list
+    const jobs = [];
+    for (const agentKey of agents) {
+      for (let i = 0; i < numRuns; i++) {
+        const elem = elements[i % elements.length];
+        jobs.push({ agentKey, element: elem });
+      }
+    }
+
+    // Process jobs one at a time with yielding
+    for (const job of jobs) {
+      const agent = SIM_AGENTS[job.agentKey];
+      const gen = simulateGameGenerator(agent, job.element);
+      let tracePoints = [];
+      let outcome = 'death';
+
+      // Run generator to completion, yielding periodically
+      let stepCount = 0;
+      let result;
+      do {
+        result = gen.next();
+        if (result.value) {
+          const { stats, done } = result.value;
+          // Collect trace points
+          if (stats.trace.length > tracePoints.length) {
+            const newPoints = stats.trace.slice(tracePoints.length);
+            tracePoints = tracePoints.concat(newPoints);
+          }
+          if (done) {
+            outcome = stats.won ? 'victory' : (stats.error ? 'error' : 'death');
+            if (stats.won) winCounts[job.agentKey] = (winCounts[job.agentKey] || 0) + 1;
+            runCounts[job.agentKey] = (runCounts[job.agentKey] || 0) + 1;
+          }
+        }
+        stepCount++;
+        // Yield to UI every 50 simulation steps
+        if (stepCount % 50 === 0) {
+          await new Promise(r => setTimeout(r, 0));
+        }
+      } while (!result.done);
+
+      // Store and draw this trace
+      allTraces.push({ points: tracePoints, color: agent.color, outcome });
+      totalCompleted++;
+      drawAllTraces();
+      updateLegend();
+      updateStatus(`Running: ${totalCompleted}/${totalPlanned} complete...`, 'running');
+
+      // Yield between runs
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    updateStatus(`Done. ${totalCompleted} runs completed.`, 'done');
+    document.getElementById('runBtn').disabled = false;
+    isRunning = false;
+  }
+
+  function clearCanvas() {
+    allTraces = [];
+    totalCompleted = 0;
+    winCounts = {};
+    runCounts = {};
+    drawBackground();
+    updateLegend();
+    updateStatus('');
+  }
+
+  // Initial draw
+  drawBackground();
+  </script>
+</body>
+</html>

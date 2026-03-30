@@ -272,7 +272,7 @@ const WORLD = {
       biome: 'forest',
       type: LOC_TYPES.BATTLE,
       x: 28.4, y: 2.9,
-      paths: ['forest_heart'],
+      paths: ['forest_heart', 'elder_tree'],
       description: 'The canopy is so thick no light reaches the forest floor. Bioluminescent fungi are the only guide.',
       image: 'images/loc_dark_forest.png',
       enemy: 'thornback',

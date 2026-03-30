@@ -182,10 +182,43 @@ const AGENTS = {
   },
 
   /**
-   * Optimal agent: considers enemy intent, energy efficiency
+   * Optimal agent: follows a scripted route through the map with smart combat
+   *
+   * Route: cliffs → shop (buy/remove) → lighthouse → shop (remove weak) →
+   *        north bay (rest/upgrade) → storm drake → village (elder reward) → forest
    */
   optimal: {
     name: 'Optimal',
+
+    // Scripted route through the coast, then into the forest
+    _route: [
+      'whispering_cliffs',        // 1. Easy battle for card reward + gold
+      'misthaven_village',        // 2. Talk to elder for lore
+      'shore_market',             // 3. Buy a good card or remove a weak one
+      'veiled_sea',               // 4. Event for potential rare card
+      'windward_lighthouse',      // 5. Elite fight for lighthouse flame
+      'veiled_sea',               // 6. Back through
+      'foggy_ambush',             // 7. Battle on the way
+      'reef_shallows',            // 8. Rest / upgrade / remove
+      'the_wild_shore',           // 9. Another battle
+      'thornwood_gate',           // 10. Mini-boss: storm drake
+      'misthaven_village',        // 11. Get elder spirit reward
+      'thornwood_gate',           // 12. Back through (cleared)
+      'spring_of_tides',          // 13. Enter forest, rest
+      'forest_edge',              // 14. Forest battle
+      'hermits_hut',              // 15. NPC lore
+      'woodcutters_camp',         // 16. Shop (mushroom grove path)
+      'mushroom_grove',           // 17. Event
+      'woodcutters_camp',         // 18. Back
+      'ruined_bridge',            // 19. Battle
+      'ancient_stump',            // 20. Rest
+      'elder_tree',               // 21. Event (offer card)
+      'ancient_stump',            // 22. Back
+      'corrupted_shrine',         // 23. Event
+      'forest_heart',             // 24. Mini-boss: corrupted treant
+    ],
+    _routeIndex: 0,
+
     pickCard(hand, energy, actor, opponent) {
       const playable = hand.filter(c => c.cost <= energy);
       if (playable.length === 0) return null;
@@ -238,7 +271,7 @@ const AGENTS = {
 
       return playable[0];
     },
-    pickMapAction() { return 'progress'; },
+    pickMapAction() { return 'scripted'; },
     pickReward(cards) {
       // Pick best card by a composite score
       let best = 0;
@@ -262,6 +295,166 @@ const AGENTS = {
       const affordable = items.filter(i => i.price <= gold);
       if (affordable.length === 0) return -1;
       // Buy strongest card we can afford
+      let best = affordable[0];
+      let bestVal = 0;
+      affordable.forEach(i => {
+        const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+        if (val > bestVal) { bestVal = val; best = i; }
+      });
+      return items.indexOf(best);
+    },
+    shouldRest(player) {
+      return player.hp < player.maxHp * 0.7;
+    },
+  },
+
+  /**
+   * Explorer agent: optimal combat but random map navigation biased toward unvisited locations
+   */
+  explorer: {
+    name: 'Explorer',
+    // Reuse optimal agent's combat logic
+    pickCard: null, // filled below
+    pickMapAction() { return 'explore'; },
+    pickReward(cards) {
+      let best = 0;
+      let bestScore = -1;
+      cards.forEach((c, i) => {
+        const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
+          if (e.type === 'burn') return s + e.value * 2;
+          if (e.type === 'heal') return s + e.value * 1.5;
+          if (e.type === 'draw') return s + e.value * 3;
+          if (e.type === 'gainEnergy') return s + e.value * 4;
+          return s + 2;
+        }, 0);
+        if (score > bestScore) { bestScore = score; best = i; }
+      });
+      return best;
+    },
+    pickEventChoice(choices) {
+      return choices.findIndex(c => c.reward) >= 0 ? choices.findIndex(c => c.reward) : 0;
+    },
+    pickShopCard(items, gold) {
+      const affordable = items.filter(i => i.price <= gold);
+      if (affordable.length === 0) return -1;
+      let best = affordable[0];
+      let bestVal = 0;
+      affordable.forEach(i => {
+        const val = i.card.damage * 2 + i.card.block + i.card.effects.length * 5;
+        if (val > bestVal) { bestVal = val; best = i; }
+      });
+      return items.indexOf(best);
+    },
+    shouldRest(player) {
+      return player.hp < player.maxHp * 0.6;
+    },
+  },
+
+  /**
+   * Lookahead agent: for each playable card, simulates random playouts of the
+   * rest of the turn + enemy response, picks the card with best average outcome.
+   * Uses scripted route for navigation (same as optimal).
+   */
+  lookahead: {
+    name: 'Lookahead',
+    _route: null, // copied from optimal after AGENTS is defined
+    _routeIndex: 0,
+    _PLAYOUTS: 8, // random playouts per card choice
+
+    pickCard(hand, energy, actor, opponent) {
+      const playable = hand.filter(c => c.cost <= energy);
+      if (playable.length === 0) return null;
+      if (playable.length === 1) return playable[0];
+
+      // Save card IDs of playable cards (survive deep copy)
+      const playableIds = playable.map(c => c.id);
+
+      // Snapshot current state
+      const savedState = _deepCopyState(gameState);
+      let bestId = playableIds[0];
+      let bestScore = -Infinity;
+
+      for (const cardId of playableIds) {
+        let totalScore = 0;
+
+        for (let p = 0; p < this._PLAYOUTS; p++) {
+          // Restore state for each playout
+          _restoreState(savedState);
+
+          // Find card by ID in restored hand
+          const idx = gameState.player.hand.findIndex(c => c.id === cardId);
+          if (idx < 0) continue;
+          playCard(idx);
+
+          // If battle ended, score immediately
+          if (gameState.phase !== GAME_PHASES.BATTLE) {
+            totalScore += _evaluateState();
+            continue;
+          }
+
+          // Play rest of turn randomly
+          let safety = 15;
+          while (gameState.phase === GAME_PHASES.BATTLE &&
+                 gameState.currentTurn === 'player' && safety-- > 0) {
+            const remaining = gameState.player.hand.filter(c => c.cost <= gameState.player.energy);
+            if (remaining.length === 0) break;
+            const ri = Math.floor(Math.random() * remaining.length);
+            const pi = gameState.player.hand.findIndex(c => c.id === remaining[ri].id);
+            if (pi < 0) break;
+            playCard(pi);
+            if (gameState.phase !== GAME_PHASES.BATTLE) break;
+          }
+
+          // End player turn if still in battle
+          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'player') {
+            endTurn();
+          }
+
+          // Let enemy take their turn
+          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'enemy') {
+            endTurn();
+          }
+
+          totalScore += _evaluateState();
+        }
+
+        const avgScore = totalScore / this._PLAYOUTS;
+        if (avgScore > bestScore) {
+          bestScore = avgScore;
+          bestId = cardId;
+        }
+      }
+
+      // Restore original state — the real game loop will play the chosen card
+      _restoreState(savedState);
+
+      // Return the matching card from the restored hand
+      return gameState.player.hand.find(c => c.id === bestId) || hand.find(c => c.cost <= energy);
+    },
+
+    pickMapAction() { return 'scripted'; },
+    pickReward(cards) {
+      // Same as optimal
+      let best = 0;
+      let bestScore = -1;
+      cards.forEach((c, i) => {
+        const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
+          if (e.type === 'burn') return s + e.value * 2;
+          if (e.type === 'heal') return s + e.value * 1.5;
+          if (e.type === 'draw') return s + e.value * 3;
+          if (e.type === 'gainEnergy') return s + e.value * 4;
+          return s + 2;
+        }, 0);
+        if (score > bestScore) { bestScore = score; best = i; }
+      });
+      return best;
+    },
+    pickEventChoice(choices) {
+      return choices.findIndex(c => c.reward) >= 0 ? choices.findIndex(c => c.reward) : 0;
+    },
+    pickShopCard(items, gold) {
+      const affordable = items.filter(i => i.price <= gold);
+      if (affordable.length === 0) return -1;
       let best = affordable[0];
       let bestVal = 0;
       affordable.forEach(i => {
@@ -524,6 +717,116 @@ const AGENTS = {
   },
 };
 
+// Wire explorer's combat to optimal's
+AGENTS.explorer.pickCard = AGENTS.optimal.pickCard;
+
+// Wire lookahead's route to optimal's
+AGENTS.lookahead._route = AGENTS.optimal._route.slice();
+
+// Deep copy/restore helpers for lookahead simulations
+function _deepCopyState(state) {
+  return JSON.parse(JSON.stringify(state, (key, value) => {
+    if (value instanceof Set) return { __set: [...value] };
+    return value;
+  }));
+}
+
+function _restoreState(snapshot) {
+  const restored = JSON.parse(JSON.stringify(snapshot), (key, value) => {
+    if (value && value.__set) return new Set(value.__set);
+    return value;
+  });
+  // Copy all properties onto gameState
+  for (const key of Object.keys(gameState)) {
+    if (!(key in restored)) delete gameState[key];
+  }
+  Object.assign(gameState, restored);
+}
+
+function _evaluateState() {
+  // Score the game state from the player's perspective
+  const p = gameState.player;
+  const e = gameState.enemy;
+
+  if (!p || p.hp <= 0) return -100; // player dead
+  if (!e || e.hp <= 0) return 100;  // enemy dead
+
+  // Weighted score: player HP matters most, enemy damage dealt is good
+  const playerHpPct = p.hp / p.maxHp;
+  const enemyHpPct = e.hp / e.maxHp;
+  const blockValue = Math.min(p.block, 15) / 15; // block is valuable up to ~15
+
+  return (playerHpPct * 40) - (enemyHpPct * 30) + (blockValue * 10);
+}
+
+// === Deck Strength Scoring ===
+
+/**
+ * Compute a composite deck strength score (roughly 0-100).
+ * Considers all cards the player owns (deck + discard + hand).
+ */
+function scoreDeck(player) {
+  const allCards = [...player.deck, ...player.discard, ...player.hand];
+  if (allCards.length === 0) return 0;
+
+  let totalValue = 0;
+
+  for (const card of allCards) {
+    let cardValue = 0;
+
+    // Raw damage and block
+    cardValue += (card.damage || 0) * 1.0;
+    cardValue += (card.block || 0) * 0.8;
+
+    // Effect values
+    for (const fx of (card.effects || [])) {
+      const dur = fx.duration || 1;
+      switch (fx.type) {
+        case 'burn':       cardValue += fx.value * dur * 1.5; break;
+        case 'heal':       cardValue += fx.value * 1.8; break;
+        case 'draw':       cardValue += fx.value * 3.0; break;
+        case 'gainEnergy': cardValue += fx.value * 4.0; break;
+        case 'thorns':     cardValue += fx.value * dur * 1.2; break;
+        case 'vulnerable': cardValue += dur * 3.0; break;
+        case 'weak':       cardValue += dur * 2.5; break;
+        case 'cleanse':    cardValue += 3.0; break;
+        default:           cardValue += 1.5; break;
+      }
+    }
+
+    // Energy efficiency bonus: high damage-per-cost is valuable
+    const cost = card.cost || 1;
+    if (cost > 0 && card.damage > 0) {
+      cardValue += (card.damage / cost) * 0.5;
+    }
+
+    // Upgraded bonus
+    if (card.upgraded) cardValue *= 1.25;
+
+    // Rarity bonus
+    const rarity = card.rarity || 'common';
+    if (rarity === 'uncommon') cardValue *= 1.1;
+    else if (rarity === 'rare') cardValue *= 1.3;
+    else if (rarity === 'legendary') cardValue *= 1.5;
+
+    totalValue += cardValue;
+  }
+
+  // Average card quality
+  const avgQuality = totalValue / allCards.length;
+
+  // Ideal deck size is around 10-12 cards. Penalize dilution.
+  const idealSize = 11;
+  const sizePenalty = Math.max(0, (allCards.length - idealSize) * 0.8);
+
+  // Score: base from average quality, scaled, minus dilution penalty
+  // avgQuality of ~8-10 for a good card, so multiply to reach 0-100 range
+  let score = avgQuality * 7 - sizePenalty;
+
+  // Clamp to 0-100
+  return Math.max(0, Math.min(100, score));
+}
+
 // === Headless Simulation Engine ===
 
 /**
@@ -549,9 +852,10 @@ function simulateGame(agent, element, ablation) {
     questsCompleted: 0,
     error: null,
     totalActions: 0,
+    trace: [],
   };
 
-  const MAX_ACTIONS = 2000; // safety limit
+  const MAX_ACTIONS = 5000; // safety limit
   const abl = ablation ? ablation.name : null;
 
   try {
@@ -567,6 +871,9 @@ function simulateGame(agent, element, ablation) {
     // Apply ablation
     _activeAblation = ablation ? ablation.name : null;
     _simVisited = new Set();
+    // Reset scripted routes
+    if (AGENTS.optimal._route) AGENTS.optimal._routeIndex = 0;
+    if (AGENTS.lookahead._route) AGENTS.lookahead._routeIndex = 0;
     if (ablation && ablation.apply) ablation.apply();
 
     let actions = 0;
@@ -581,6 +888,7 @@ function simulateGame(agent, element, ablation) {
         break;
       }
 
+
       if (gameState.phase === GAME_PHASES.GAME_OVER) {
         stats.diedAt = gameState._battleLocationId || 'unknown';
         stats.finalHp = 0;
@@ -594,6 +902,14 @@ function simulateGame(agent, element, ablation) {
           stats.error = `Map error: ${e.message} (act ${gameState.campaign.currentAct})`;
           break;
         }
+        // Record trace point after map turn
+        stats.trace.push({
+          hp: gameState.player.hp,
+          maxHp: gameState.player.maxHp,
+          deckScore: scoreDeck(gameState.player),
+          location: gameState.campaign.currentLocation,
+          action: actions,
+        });
         continue;
       }
 
@@ -605,6 +921,14 @@ function simulateGame(agent, element, ablation) {
           gameState.enemy._doubled = true;
         }
         simulateBattleTurn(agent, stats);
+        // Record trace point after battle
+        stats.trace.push({
+          hp: gameState.player.hp,
+          maxHp: gameState.player.maxHp,
+          deckScore: scoreDeck(gameState.player),
+          location: gameState.campaign ? gameState.campaign.currentLocation : 'unknown',
+          action: actions,
+        });
         continue;
       }
 
@@ -688,7 +1012,7 @@ function simulateGame(agent, element, ablation) {
       }
 
       if (gameState.phase === GAME_PHASES.NPC) {
-        advanceAfterNode();
+        leaveNpc();
         continue;
       }
 
@@ -699,6 +1023,10 @@ function simulateGame(agent, element, ablation) {
         if (event) {
           const choice = agent.pickEventChoice(event.choices);
           doEventChoice(choice);
+          // Chest animation writes to DOM without changing phase — skip to card reward
+          if (gameState.phase === GAME_PHASES.EVENT && gameState._rewardCards) {
+            gameState.phase = GAME_PHASES.CARD_REWARD;
+          }
         } else {
           advanceAfterNode();
         }
@@ -706,12 +1034,28 @@ function simulateGame(agent, element, ablation) {
       }
 
       if (gameState.phase === GAME_PHASES.CARD_UPGRADE) {
+        // Handle upgrade preview confirmation
+        if (gameState._upgradePreviewCardId) {
+          confirmUpgrade();
+          continue;
+        }
+
         const mode = gameState._upgradeMode || 'upgrade';
-        const allCards = [...gameState.player.deck, ...gameState.player.discard];
+        const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
         const cards = mode === 'upgrade' ? allCards.filter(c => !c.upgraded) : allCards;
 
         if (cards.length === 0) {
-          advanceAfterNode();
+          returnFromUpgrade();
+          continue;
+        }
+
+        // Check gold for upgrade/remove at rest sites
+        if (mode === 'upgrade' && !gameState._returnToShop && gameState.campaign.gold < CARD_UPGRADE_PRICE) {
+          returnFromUpgrade();
+          continue;
+        }
+        if (mode === 'remove' && !gameState._returnToShop && gameState.campaign.gold < CARD_REMOVE_PRICE) {
+          returnFromUpgrade();
           continue;
         }
 
@@ -734,6 +1078,23 @@ function simulateGame(agent, element, ablation) {
           });
           doCardAction(bestIdx);
         }
+        continue;
+      }
+
+      // Mini-boss victory screen — continue to card reward
+      if (gameState.phase === 'mini_boss_victory') {
+        continueAfterMiniBoss();
+        continue;
+      }
+
+      // Tree offering — skip the animation, just grant a rare card
+      if (gameState._treeOffering) {
+        delete gameState._treeOffering;
+        delete gameState._treeResult;
+        const rareCard = getRareCard();
+        gameState.player.deck.push(rareCard);
+        clearLocation(gameState.campaign.currentLocation);
+        returnToMap();
         continue;
       }
 
@@ -886,6 +1247,47 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
+  // Explorer: prefer unvisited, then uncleared, with randomness
+  if (agent.name === 'Explorer') {
+    const unvisited = connections.filter(id => !campaign.visited.has(id));
+    if (unvisited.length > 0) return unvisited[Math.floor(Math.random() * unvisited.length)];
+    const uncleared = connections.filter(id => !campaign.cleared.has(id));
+    if (uncleared.length > 0) return uncleared[Math.floor(Math.random() * uncleared.length)];
+    return connections[Math.floor(Math.random() * connections.length)];
+  }
+
+  // Optimal agent: follow scripted route
+  if (agent.name === 'Optimal' && agent._route) {
+    // Find the next destination in the route that we can travel to
+    while (agent._routeIndex < agent._route.length) {
+      const target = agent._route[agent._routeIndex];
+      if (connections.includes(target)) {
+        agent._routeIndex++;
+        return target;
+      }
+      // Target not directly reachable — try to pathfind toward it
+      // Pick the connection closest to the target in the route
+      const targetLoc = WORLD.locations[target];
+      if (targetLoc) {
+        let bestConn = null;
+        let bestDist = Infinity;
+        for (const connId of connections) {
+          const connLoc = WORLD.locations[connId];
+          if (!connLoc) continue;
+          const dx = connLoc.x - targetLoc.x;
+          const dy = connLoc.y - targetLoc.y;
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDist) { bestDist = dist; bestConn = connId; }
+        }
+        if (bestConn) return bestConn;
+      }
+      // Can't reach this target at all, skip it
+      agent._routeIndex++;
+    }
+    // Route exhausted — fall through to scored navigation
+  }
+
+  // Fallback: score-based navigation
   const scored = connections.map(id => {
     const loc = WORLD.locations[id];
     if (!loc) return { id, score: -100 };
@@ -898,20 +1300,16 @@ function pickDestination(agent, connections) {
     if (loc.type === LOC_TYPES.REST && hpRatio < 0.6 && canRest()) score += 15;
     if (loc.type === LOC_TYPES.REST && !canRest()) score -= 5;
     if (loc.type === LOC_TYPES.SHOP && campaign.gold >= 8) score += 10;
-    // Strongly prioritize elite (lighthouse) before boss — the special reward is key
     if (loc.type === LOC_TYPES.ELITE && !cleared && hpRatio > 0.5) score += 25;
     if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.4) score -= 10;
     if (loc.type === LOC_TYPES.MINI_BOSS || loc.type === LOC_TYPES.BOSS) {
-      // Only go to boss after clearing the elite
-      const eliteCleared = Object.entries(WORLD.locations).some(([id, l]) => l.type === LOC_TYPES.ELITE && campaign.cleared.has(id));
+      const eliteCleared = Object.entries(WORLD.locations).some(([eid, l]) => l.type === LOC_TYPES.ELITE && campaign.cleared.has(eid));
       if (eliteCleared && hpRatio > 0.5) score += 15;
       else if (!eliteCleared) score -= 20;
       else score -= 5;
     }
     if (loc.type === LOC_TYPES.EVENT && !cleared) score += 8;
-    // Strongly prioritize elder tree for deck improvement
     if (id === 'elder_tree' && !cleared) score += 20;
-
     if (_simVisited.has(id)) score -= 15;
 
     return { id, score };
@@ -938,12 +1336,11 @@ function simulateBattleTurn(agent, stats) {
       let cardsThisTurn = 0;
       const MAX_CARDS_PER_TURN = 20;
       while (cardsThisTurn < MAX_CARDS_PER_TURN && gameState.phase === GAME_PHASES.BATTLE) {
-        const actor = gameState.player;
-        const opponent = gameState.enemy;
-        const card = agent.pickCard(actor.hand, actor.energy, actor, opponent);
+        const card = agent.pickCard(gameState.player.hand, gameState.player.energy, gameState.player, gameState.enemy);
         if (!card) break;
 
-        const index = actor.hand.indexOf(card);
+        // Re-read hand after pickCard (lookahead agent may restore state)
+        const index = gameState.player.hand.findIndex(c => c.id === card.id);
         if (index < 0) break;
 
         gameState.selectedCardIndex = index;
@@ -987,7 +1384,7 @@ function simulateBattleTurn(agent, stats) {
 
 function runSimulations() {
   const elements = FORCE_ELEMENT ? [FORCE_ELEMENT] : ['fire', 'water', 'earth', 'air'];
-  const defaultAgents = ['random', 'greedy', 'optimal'];
+  const defaultAgents = ['random', 'explorer', 'optimal', 'lookahead'];
   const agentNames = AGENT_FILTER === 'all' ? Object.keys(AGENTS)
     : AGENT_FILTER === 'default' ? defaultAgents
     : [AGENT_FILTER];
@@ -1078,6 +1475,8 @@ function runSimulations() {
       assessment = winRate < 5 ? '❌ Too hard' : winRate < 30 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else if (agentName === 'optimal') {
       assessment = winRate < 15 ? '❌ Too hard' : winRate < 60 ? '✅ Good balance' : '⚠️ Slightly easy';
+    } else if (agentName === 'lookahead') {
+      assessment = winRate < 20 ? '❌ Too hard' : winRate < 65 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else if (agentName === 'expert') {
       assessment = winRate < 30 ? '❌ Too hard' : winRate < 75 ? '✅ Good balance' : '⚠️ Slightly easy';
     } else {
@@ -1219,7 +1618,7 @@ function runFromTest(fromLoc) {
       _simVisited = new Set();
 
       let actions = 0;
-      while (actions < 2000) {
+      while (actions < 5000) {
         actions++;
         if (gameState.phase === GAME_PHASES.VICTORY || gameState.phase === GAME_PHASES.GAME_OVER) break;
 
@@ -1287,7 +1686,7 @@ function runFromTest(fromLoc) {
     const stats = { battlesFought: 0, totalTurns: 0, totalCardsPlayed: 0, error: null };
 
     let actions = 0;
-    while (actions < 2000) {
+    while (actions < 5000) {
       actions++;
       if (gameState.phase === GAME_PHASES.VICTORY) { wins++; totalHp += gameState.player.hp; break; }
       if (gameState.phase === GAME_PHASES.GAME_OVER) {
