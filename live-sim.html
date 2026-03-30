@@ -205,8 +205,9 @@
     </div>
     <button id="runBtn" onclick="startSimulation()">Run</button>
     <button class="clear-btn" onclick="clearCanvas()">Clear</button>
-    <button class="clear-btn" onclick="document.getElementById('traceFile').click()">Load Traces</button>
+    <button class="clear-btn" onclick="document.getElementById('traceFile').click()">Load File</button>
     <input type="file" id="traceFile" accept=".json" style="display:none" onchange="loadTraceFile(event)">
+    <button class="clear-btn" onclick="autoLoadTraces()">Auto-Load sim-traces.json</button>
   </div>
 
   <div class="canvas-container">
@@ -1250,6 +1251,44 @@
     drawBackground();
     updateLegend();
     updateStatus('');
+  }
+
+  let _autoLoadInterval = null;
+  let _lastTraceCount = 0;
+
+  function autoLoadTraces() {
+    if (_autoLoadInterval) {
+      clearInterval(_autoLoadInterval);
+      _autoLoadInterval = null;
+      updateStatus('Auto-load stopped', '');
+      return;
+    }
+    updateStatus('Auto-loading sim-traces.json every 3s...', 'running');
+    fetchTraces(); // immediate first load
+    _autoLoadInterval = setInterval(fetchTraces, 3000);
+  }
+
+  function fetchTraces() {
+    fetch('sim-traces.json?t=' + Date.now())
+      .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+      .then(traces => {
+        if (traces.length === _lastTraceCount) return; // no new data
+        // Replace all traces with fresh data
+        allTraces = [];
+        winCounts = {};
+        runCounts = {};
+        for (const t of traces) {
+          allTraces.push({ points: t.points, color: t.color, outcome: t.outcome });
+          const agentKey = t.agent;
+          runCounts[agentKey] = (runCounts[agentKey] || 0) + 1;
+          if (t.outcome === 'victory') winCounts[agentKey] = (winCounts[agentKey] || 0) + 1;
+        }
+        _lastTraceCount = traces.length;
+        drawAllTraces();
+        updateLegend();
+        updateStatus(`Auto-loaded ${traces.length} traces`, 'running');
+      })
+      .catch(() => {}); // silently ignore if file doesn't exist yet
   }
 
   function loadTraceFile(event) {

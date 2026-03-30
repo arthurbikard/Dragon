@@ -49,14 +49,14 @@ const AI_ENEMIES = [
     id: 'thornback',
     name: 'Thornback',
     element: ELEMENTS.EARTH,
-    hp: 38,
-    maxHp: 38,
+    hp: 58,
+    maxHp: 58,
     image: 'images/enemy_forest_wyrm.png',
-    // Thorns but lower — still punishes multi-hit but not devastating
+    // Tanky with thorns — punishes careless attackers, heavy hits wear you down
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 7, weight: 3 },
-      { type: INTENT_TYPES.DEFEND, block: 6, effects: [{ type: 'thorns', value: 2, duration: 2 }], weight: 2 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 12, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 12, weight: 3 },
+      { type: INTENT_TYPES.DEFEND, block: 10, effects: [{ type: 'thorns', value: 3, duration: 3 }], weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 19, weight: 1 },
     ],
   },
   {
@@ -79,44 +79,44 @@ const AI_ENEMIES = [
     id: 'fungal_crawler',
     name: 'Fungal Crawler',
     element: ELEMENTS.EARTH,
-    hp: 36,
-    maxHp: 36,
+    hp: 52,
+    maxHp: 52,
     image: 'images/enemy_forest_wyrm.png',
-    // Poisons and weakens — rewards cleanse cards and fast kills
+    // Debuff-heavy — weakens your attacks while burning you down over time
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 7, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 3 },
-      { type: INTENT_TYPES.ATTACK, damage: 5, effects: [{ type: 'burn', value: 2, duration: 3 }], weight: 2 },
-      { type: INTENT_TYPES.DEFEND, block: 6, weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 10, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 3 },
+      { type: INTENT_TYPES.ATTACK, damage: 8, effects: [{ type: 'burn', value: 3, duration: 3 }], weight: 2 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 15, effects: [{ type: 'vulnerable', value: 1, duration: 2 }], weight: 1 },
     ],
   },
   {
     id: 'giant_spider',
     name: 'Giant Spider',
     element: ELEMENTS.EARTH,
-    hp: 62,
-    maxHp: 62,
+    hp: 72,
+    maxHp: 72,
     image: 'images/enemy_forest_wyrm.png',
     // Elite — fast and deadly. Alternates big hits with debuffs.
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 11, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 20, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 13, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 22, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 1 },
       { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 3 }], weight: 2 },
-      { type: INTENT_TYPES.DEFEND, block: 8, effects: [{ type: 'thorns', value: 3, duration: 2 }], weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 10, effects: [{ type: 'thorns', value: 4, duration: 2 }], weight: 1 },
     ],
   },
   {
     id: 'corrupted_treant',
     name: 'Corrupted Treant',
     element: ELEMENTS.EARTH,
-    hp: 60,
-    maxHp: 60,
+    hp: 95,
+    maxHp: 95,
     image: 'images/enemy_ember_titan.png',
-    // Forest mini-boss — thorns + strength make it dangerous but lower HP than Storm Drake
+    // Forest mini-boss — high HP, thorns punish attackers, strength snowballs
     intents: [
-      { type: INTENT_TYPES.ATTACK, damage: 10, weight: 3 },
-      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 18, weight: 1 },
-      { type: INTENT_TYPES.DEFEND, block: 14, effects: [{ type: 'thorns', value: 3, duration: 3 }], weight: 2 },
-      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 3 }], weight: 1 },
+      { type: INTENT_TYPES.ATTACK, damage: 14, weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 25, weight: 1 },
+      { type: INTENT_TYPES.DEFEND, block: 16, effects: [{ type: 'thorns', value: 4, duration: 3 }], weight: 2 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 3, duration: 4 }], weight: 1 },
     ],
   },
 

@@ -71,6 +71,10 @@ const VERBOSE = !!args.verbose;
 const JSON_OUTPUT = !!args.json;
 const ABLATION_MODE = args.ablation || null;
 const TRACE_OUTPUT = args.trace ? (args.trace === true ? 'sim-traces.json' : args.trace) : null;
+const SAVE_STATES = args['save-states'] ? (args['save-states'] === true ? 'saved-states.json' : args['save-states']) : null;
+const LOAD_STATE = args['load-state'] || null;
+const _savedStates = [];
+let _loadedStates = null;
 
 // === Ablation Definitions ===
 const ABLATIONS = {
@@ -360,61 +364,99 @@ const AGENTS = {
     name: 'Lookahead',
     _route: null, // copied from optimal after AGENTS is defined
     _routeIndex: 0,
-    _PLAYOUTS: 8, // random playouts per card choice
+    _PLAYOUTS: 3,
 
     pickCard(hand, energy, actor, opponent) {
       const playable = hand.filter(c => c.cost <= energy);
       if (playable.length === 0) return null;
       if (playable.length === 1) return playable[0];
 
-      // Save card IDs of playable cards (survive deep copy)
-      const playableIds = playable.map(c => c.id);
+      const intent = opponent.nextIntent;
+      const enemyAttacking = intent && (intent.type === 'attack' || intent.type === 'heavy_attack');
+      const incomingDamage = enemyAttacking ? (intent.damage || 0) : 0;
 
-      // Snapshot current state
+      // Heuristic pre-score: bias toward defense when enemy attacks, attack otherwise
+      function heuristicBonus(card) {
+        let bonus = 0;
+        if (enemyAttacking) {
+          // Prefer block/heal when enemy is attacking
+          if (card.block > 0) bonus += Math.min(card.block, incomingDamage) * 1.5;
+          if (card.effects.some(e => e.type === 'heal')) bonus += 8;
+        } else {
+          // Prefer damage/burn when enemy is buffing/defending
+          if (card.damage > 0) bonus += card.damage * 1.2;
+          if (card.effects.some(e => e.type === 'burn')) bonus += 6;
+          if (card.effects.some(e => e.type === 'vulnerable')) bonus += 5;
+        }
+        // Always prioritize card draw and energy gain — they amplify everything
+        for (const e of card.effects) {
+          if (e.type === 'draw') bonus += e.value * 6;
+          if (e.type === 'gainEnergy') bonus += e.value * 8;
+        }
+        if (card.cost === 0) bonus += 6;
+        return bonus;
+      }
+
+      // Prune dominated cards: if two cards are same type (attack/block/skill),
+      // skip the strictly weaker one (e.g., block 3 when block 4 exists at same cost)
+      const dominated = new Set();
+      for (let i = 0; i < playable.length; i++) {
+        for (let j = 0; j < playable.length; j++) {
+          if (i === j) continue;
+          const a = playable[i], b = playable[j];
+          if (a.cost === b.cost && a.type === b.type &&
+              a.damage <= b.damage && a.block <= b.block &&
+              a.effects.length <= b.effects.length &&
+              (a.damage < b.damage || a.block < b.block)) {
+            dominated.add(a.id);
+          }
+        }
+      }
+      const candidates = playable.filter(c => !dominated.has(c.id));
+      if (candidates.length === 1) return candidates[0];
+
+      const candidateIds = candidates.map(c => c.id);
       const savedState = _deepCopyState(gameState);
-      let bestId = playableIds[0];
+      let bestId = candidateIds[0];
       let bestScore = -Infinity;
 
-      for (const cardId of playableIds) {
-        let totalScore = 0;
+      for (let ci = 0; ci < candidateIds.length; ci++) {
+        const cardId = candidateIds[ci];
+        const card = candidates[ci];
+        let totalScore = heuristicBonus(card); // start with heuristic bias
 
         for (let p = 0; p < this._PLAYOUTS; p++) {
-          // Restore state for each playout
           _restoreState(savedState);
 
-          // Find card by ID in restored hand
           const idx = gameState.player.hand.findIndex(c => c.id === cardId);
           if (idx < 0) continue;
           playCard(idx);
 
-          // If battle ended, score immediately
           if (gameState.phase !== GAME_PHASES.BATTLE) {
             totalScore += _evaluateState();
             continue;
           }
 
-          // Play rest of turn randomly
+          // Play rest of turn with heuristic bias (not purely random)
           let safety = 15;
           while (gameState.phase === GAME_PHASES.BATTLE &&
                  gameState.currentTurn === 'player' && safety-- > 0) {
             const remaining = gameState.player.hand.filter(c => c.cost <= gameState.player.energy);
             if (remaining.length === 0) break;
-            const ri = Math.floor(Math.random() * remaining.length);
-            const pi = gameState.player.hand.findIndex(c => c.id === remaining[ri].id);
+            // Pick weighted by heuristic
+            let bestR = remaining[0], bestRScore = -Infinity;
+            for (const r of remaining) {
+              const s = heuristicBonus(r) + Math.random() * 5;
+              if (s > bestRScore) { bestRScore = s; bestR = r; }
+            }
+            const pi = gameState.player.hand.findIndex(c => c.id === bestR.id);
             if (pi < 0) break;
             playCard(pi);
             if (gameState.phase !== GAME_PHASES.BATTLE) break;
           }
 
-          // End player turn if still in battle
-          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'player') {
-            endTurn();
-          }
-
-          // Let enemy take their turn
-          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'enemy') {
-            endTurn();
-          }
+          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'player') endTurn();
+          if (gameState.phase === GAME_PHASES.BATTLE && gameState.currentTurn === 'enemy') endTurn();
 
           totalScore += _evaluateState();
         }
@@ -426,10 +468,7 @@ const AGENTS = {
         }
       }
 
-      // Restore original state — the real game loop will play the chosen card
       _restoreState(savedState);
-
-      // Return the matching card from the restored hand
       return gameState.player.hand.find(c => c.id === bestId) || hand.find(c => c.cost <= energy);
     },
 
@@ -860,12 +899,21 @@ function simulateGame(agent, element, ablation) {
   const abl = ablation ? ablation.name : null;
 
   try {
-    // Init game
-    gameState = createGameState();
-    gameState.mode = GAME_MODES.AI;
-    gameState.player = createPlayerState(element, STARTING_HP);
-    gameState.campaign = createCampaignState();
-    gameState.phase = GAME_PHASES.MAP;
+    // Init game — from saved state or fresh
+    if (_loadedStates && _loadedStates.length > 0) {
+      const snapshot = _loadedStates[Math.floor(Math.random() * _loadedStates.length)];
+      _restoreState(snapshot);
+      // Handle the mini-boss victory screen we saved at
+      if (gameState.phase === 'mini_boss_victory') {
+        continueAfterMiniBoss();
+      }
+    } else {
+      gameState = createGameState();
+      gameState.mode = GAME_MODES.AI;
+      gameState.player = createPlayerState(element, STARTING_HP);
+      gameState.campaign = createCampaignState();
+      gameState.phase = GAME_PHASES.MAP;
+    }
     _mapVisitCount = {};
     _mapStateKey = '';
 
@@ -1086,6 +1134,10 @@ function simulateGame(agent, element, ablation) {
 
       // Mini-boss victory screen — continue to card reward
       if (gameState.phase === 'mini_boss_victory') {
+        // Save state snapshot after first mini-boss
+        if (SAVE_STATES && gameState._miniBossVictory) {
+          _savedStates.push(_deepCopyState(gameState));
+        }
         continueAfterMiniBoss();
         continue;
       }
@@ -1392,9 +1444,23 @@ function runSimulations() {
     : AGENT_FILTER === 'default' ? defaultAgents
     : [AGENT_FILTER];
 
+  // Load saved states if requested
+  if (LOAD_STATE) {
+    try {
+      const raw = fs.readFileSync(LOAD_STATE, 'utf8');
+      _loadedStates = JSON.parse(raw);
+      console.log(`\nLoaded ${_loadedStates.length} saved states from ${LOAD_STATE}`);
+    } catch (e) {
+      console.error(`Failed to load states from ${LOAD_STATE}: ${e.message}`);
+      return;
+    }
+  }
+
   console.log(`\n🐉 Dragon Cards Simulator`);
   console.log(`   Runs: ${NUM_RUNS} per agent × ${elements.length} elements`);
-  console.log(`   Agents: ${agentNames.join(', ')}\n`);
+  console.log(`   Agents: ${agentNames.join(', ')}`);
+  if (_loadedStates) console.log(`   Starting from: ${LOAD_STATE} (${_loadedStates.length} states)`);
+  console.log('');
 
   const allResults = {};
 
@@ -1516,10 +1582,21 @@ function runSimulations() {
     console.log(JSON.stringify(jsonOutput, null, 2));
   }
 
+  // Save game states after first mini-boss
+  if (SAVE_STATES && _savedStates.length > 0) {
+    fs.writeFileSync(SAVE_STATES, JSON.stringify(_savedStates));
+    console.log(`Saved ${_savedStates.length} post-mini-boss states to ${SAVE_STATES}`);
+  }
+
   // Trace output for live-sim.html visualization
   if (TRACE_OUTPUT) {
     const agentColors = { random: '#888888', explorer: '#4488dd', optimal: '#c8a96e', lookahead: '#cc55cc', expert: '#44cccc' };
-    const traces = [];
+    // Load existing traces to append
+    let traces = [];
+    try {
+      const existing = fs.readFileSync(TRACE_OUTPUT, 'utf8');
+      traces = JSON.parse(existing);
+    } catch (e) { /* no existing file */ }
     for (const agentName of agentNames) {
       const results = allResults[agentName];
       for (const r of results) {
@@ -1532,7 +1609,7 @@ function runSimulations() {
       }
     }
     fs.writeFileSync(TRACE_OUTPUT, JSON.stringify(traces));
-    console.log(`Traces saved to ${TRACE_OUTPUT} (${traces.length} runs)`);
+    console.log(`Traces saved to ${TRACE_OUTPUT} (${traces.length} total, appended)`);
   }
 }
 
