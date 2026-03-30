@@ -12,11 +12,13 @@ function renderMap() {
   return `
     <div class="screen map-screen">
       <div class="map-topbar">
-        <span class="map-gold">💰 ${campaign.gold}</span>
-        <span class="map-deck" onclick="openDeckViewer()" style="cursor:pointer">📚 ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
-        <span class="map-hp">❤️ ${gameState.player.hp}/${gameState.player.maxHp}</span>
-        <span class="map-menu-btn" onclick="openGameMenu()">⚙</span>
-        ${MAP_DEBUG ? '<button class="map-debug-btn" onclick="exportNodePositions()">📋 Export</button>' : ''}
+        <span class="map-gold">${icon('coins', 16, '#c8a96e')} ${campaign.gold}</span>
+        <span class="map-deck" onclick="openDeckViewer()" style="cursor:pointer">${icon('card-deck', 16, '#c8a96e')} ${gameState.player.deck.length + gameState.player.hand.length + gameState.player.discard.length}</span>
+        <span class="map-hp">${icon('heart', 16, '#e05555')} ${gameState.player.hp}/${gameState.player.maxHp}</span>
+        <span class="map-menu-btn" onclick="openGameMenu()">${icon('gear', 18, '#c8a96e')}</span>
+        ${MAP_DEBUG ? `<button class="map-debug-btn" onclick="exportNodePositions()">${icon('clipboard', 14)} Export</button>
+        <button class="map-debug-btn" onclick="toggleLinkMode()" id="linkModeBtn" style="${_linkMode ? 'background:#c44' : ''}">${icon('link', 14)} ${_linkMode ? 'Link ON' : 'Link'}</button>
+        <button class="map-debug-btn" onclick="exportConnections()">${icon('clipboard', 14)} Paths</button>` : ''}
       </div>
       <div class="world-viewport" id="worldViewport">
         <div class="world-canvas" id="worldCanvas">
@@ -60,6 +62,7 @@ function initDragListeners() {
   canvas.addEventListener('mousedown', (e) => {
     const node = e.target.closest('.world-location');
     if (!node) return;
+    if (_linkMode) return; // let onclick handle it
     e.preventDefault();
     e.stopPropagation();
     _dragTarget = node;
@@ -108,6 +111,7 @@ function initDragListeners() {
   canvas.addEventListener('touchstart', (e) => {
     const node = e.target.closest('.world-location');
     if (!node) return;
+    if (_linkMode) return;
     e.preventDefault();
     _dragTarget = node;
     _didDrag = false;
@@ -191,6 +195,73 @@ function exportNodePositions() {
   });
 }
 
+// === DEBUG: Link mode (edit connections) ===
+var _linkMode = false;
+var _linkSource = null;
+
+function toggleLinkMode() {
+  _linkMode = !_linkMode;
+  _linkSource = null;
+  renderGame();
+}
+
+function onDebugNodeClick(locId) {
+  if (!_linkMode) return false;
+  if (!_linkSource) {
+    _linkSource = locId;
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) debugEl.textContent = `Link from: ${locId} → click another node (or same to cancel)`;
+    // Highlight source node
+    const node = document.querySelector(`[data-loc-id="${locId}"]`);
+    if (node) node.style.outline = '3px solid #f44';
+    return true;
+  }
+  // Second click
+  const source = _linkSource;
+  _linkSource = null;
+  // Remove highlight
+  const oldNode = document.querySelector(`[data-loc-id="${source}"]`);
+  if (oldNode) oldNode.style.outline = '';
+
+  if (source === locId) {
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) debugEl.textContent = 'Link cancelled';
+    return true;
+  }
+
+  // Toggle connection
+  const srcLoc = WORLD.locations[source];
+  const dstLoc = WORLD.locations[locId];
+  const hasLink = srcLoc.paths.includes(locId);
+
+  if (hasLink) {
+    srcLoc.paths = srcLoc.paths.filter(p => p !== locId);
+    dstLoc.paths = dstLoc.paths.filter(p => p !== source);
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) debugEl.textContent = `Removed: ${source} ↔ ${locId}`;
+  } else {
+    srcLoc.paths.push(locId);
+    dstLoc.paths.push(source);
+    const debugEl = document.getElementById('debugCoords');
+    if (debugEl) debugEl.textContent = `Added: ${source} ↔ ${locId}`;
+  }
+  renderWorldPaths();
+  return true;
+}
+
+function exportConnections() {
+  const lines = [];
+  for (const [id, loc] of Object.entries(WORLD.locations)) {
+    lines.push(`${id}: [${loc.paths.map(p => `'${p}'`).join(', ')}]`);
+  }
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Paths copied to clipboard!\n\n' + text);
+  }).catch(() => {
+    alert('Paths:\n\n' + text);
+  });
+}
+
 function renderWorldLocations() {
   const campaign = gameState.campaign;
   let html = '';
@@ -212,16 +283,16 @@ function renderWorldLocations() {
     else if (explored) stateClass = 'loc-explored';
 
     const pos = getLocationPixelPos(loc);
-    const icon = LOC_ICONS[loc.type] || '❓';
+    const locIcon = LOC_ICONS[loc.type] || icon('question', 20, '#8888cc');
     const imgStyle = loc.image ? `background-image: url('${loc.image}')` : '';
 
     html += `
       <div class="world-location ${stateClass} ${canTravel ? 'loc-tappable' : ''}"
            style="left: ${pos.x}px; top: ${pos.y}px"
            data-loc-id="${id}"
-           onclick="${canTravel || isCurrent ? `onLocationTap('${id}')` : ''}">
+           onclick="${MAP_DEBUG && _linkMode ? `onDebugNodeClick('${id}')` : (canTravel || isCurrent ? `onLocationTap('${id}')` : '')}">
         <div class="loc-node" style="${imgStyle}">
-          ${!loc.image ? `<span class="loc-icon">${icon}</span>` : ''}
+          ${!loc.image ? `<span class="loc-icon">${locIcon}</span>` : ''}
         </div>
         <span class="loc-name">${MAP_DEBUG || visited || isCurrent ? loc.name : '???'}</span>
       </div>
@@ -306,7 +377,7 @@ function renderLocationPanel() {
       case LOC_TYPES.BOSS:
         actions = `<button class="btn btn-primary" onclick="enterLocation()">Fight</button>`;
         if (isCombat) {
-          actions += `<span class="panel-blocked">⚠ Must fight to proceed</span>`;
+          actions += `<span class="panel-blocked">${icon('crossed-swords', 14, '#e05555')} Must fight to proceed</span>`;
         }
         break;
       case LOC_TYPES.SHOP:
@@ -363,9 +434,9 @@ function renderLocationPanel() {
     .filter(c => canTravelTo(c.id))
     .map(c => {
       const cCleared = gameState.campaign.cleared.has(c.id);
-      const icon = LOC_ICONS[c.type] || '?';
+      const locIcon = LOC_ICONS[c.type] || icon('question', 16, '#8888cc');
       return `<button class="travel-btn ${cCleared ? 'travel-cleared' : ''}" onclick="doTravel('${c.id}')">
-        ${icon} ${gameState.campaign.visited.has(c.id) ? c.name : '???'}
+        ${locIcon} ${gameState.campaign.visited.has(c.id) ? c.name : '???'}
       </button>`;
     }).join('');
 
@@ -455,12 +526,22 @@ function enterLocation() {
       gameState.phase = GAME_PHASES.EVENT;
       renderGame();
       break;
-    case LOC_TYPES.NPC:
-      gameState._currentNpc = loc.npc;
+    case LOC_TYPES.NPC: {
+      const npc = loc.npc;
+      // Check for post-condition dialogue and reward
+      const hasReward = npc.npcRewardCondition
+        && gameState.campaign.cleared.has(npc.npcRewardCondition)
+        && !gameState.campaign.npcRewardsCollected?.has(locId);
+      gameState._currentNpc = {
+        ...npc,
+        dialogue: hasReward && npc.rewardDialogue ? npc.rewardDialogue : npc.dialogue,
+        _grantReward: hasReward ? npc.npcReward : null,
+      };
       gameState._npcDialogueIndex = 0;
       gameState.phase = GAME_PHASES.NPC;
       renderGame();
       break;
+    }
     case LOC_TYPES.TREASURE:
       openTreasure(locId);
       break;
@@ -478,18 +559,18 @@ function renderRest() {
       <div class="rest-choices">
         ${healAmount > 0 ? `
           <button class="rest-choice" onclick="doRest()">
-            <span class="rest-choice-icon">❤️</span>
+            <span class="rest-choice-icon">${icon('heart', 28, '#e05555')}</span>
             <span class="rest-choice-label">Rest</span>
             <span class="rest-choice-desc">Heal ${healAmount} HP</span>
           </button>
         ` : ''}
         <button class="rest-choice" onclick="openUpgradeSelect()">
-          <span class="rest-choice-icon">⬆️</span>
+          <span class="rest-choice-icon">${icon('arrow-up', 28, '#55cc55')}</span>
           <span class="rest-choice-label">Upgrade</span>
           <span class="rest-choice-desc">Enhance a card</span>
         </button>
         <button class="rest-choice" onclick="openRemoveSelect()">
-          <span class="rest-choice-icon">🗑️</span>
+          <span class="rest-choice-icon">${icon('trash', 28, '#aa6666')}</span>
           <span class="rest-choice-label">Remove</span>
           <span class="rest-choice-desc">Thin your deck</span>
         </button>
@@ -546,7 +627,11 @@ function closeGameMenu() {
 
 function confirmQuit() {
   closeGameMenu();
-  returnToMenu();
+  // Save progress before quitting
+  saveGame();
+  gameState = createGameState();
+  currentProfile = null;
+  renderGame();
 }
 
 // === DECK VIEWER ===
@@ -659,24 +744,24 @@ function renderShop() {
   return `
     <div class="screen shop-screen">
       <h2 class="screen-title">Shop</h2>
-      <div class="shop-gold">💰 ${gold} gold</div>
+      <div class="shop-gold">${icon('coins', 16, '#c8a96e')} ${gold} gold</div>
       <div class="shop-cards">
         ${items.map((item, i) => `
           <div class="shop-item ${gold >= item.price ? '' : 'shop-item-expensive'}" onclick="${gold >= item.price ? `buyCard(${i})` : ''}">
             ${renderCard(item.card, -1, false)}
-            <div class="shop-price ${item.type === 'rare' ? 'shop-price-rare' : ''}">💰 ${item.price}</div>
+            <div class="shop-price ${item.type === 'rare' ? 'shop-price-rare' : ''}">${icon('coins', 12, '#c8a96e')} ${item.price}</div>
           </div>
         `).join('')}
       </div>
       <div class="shop-services">
         <div class="shop-service ${gold >= CARD_REMOVE_PRICE ? '' : 'shop-item-expensive'}"
              onclick="${gold >= CARD_REMOVE_PRICE ? 'openShopRemove()' : ''}">
-          🗑️ Remove a card — 💰 ${CARD_REMOVE_PRICE}
+          ${icon('trash', 14, '#aa6666')} Remove a card — ${icon('coins', 12, '#c8a96e')} ${CARD_REMOVE_PRICE}
         </div>
         ${canHeal ? `
           <div class="shop-service ${gold >= SHOP_HEAL_PRICE ? '' : 'shop-item-expensive'}"
                onclick="${gold >= SHOP_HEAL_PRICE ? 'buyHeal()' : ''}">
-            ❤️ Heal ${SHOP_HEAL_AMOUNT} HP — 💰 ${SHOP_HEAL_PRICE}
+            ${icon('heart', 14, '#e05555')} Heal ${SHOP_HEAL_AMOUNT} HP — ${icon('coins', 12, '#c8a96e')} ${SHOP_HEAL_PRICE}
           </div>
         ` : ''}
       </div>
@@ -783,6 +868,17 @@ function doEventChoice(index) {
       addLog(`Gained rare card: ${card.name}!`);
       showNotification(`+ ${card.name}`, 'card');
     }
+    if (choice.reward.chestReward) {
+      const biome = WORLD.locations[gameState.campaign.currentLocation]?.biome;
+      const rareCard = getRareCard();
+      const filler = getBiomeRewardCards(biome, (choice.reward.cardCount || 3) - 1);
+      gameState._rewardCards = shuffleArray([rareCard, ...filler]);
+      gameState._rewardSkippable = true;
+      gameState._chestResult = choice.result;
+      clearLocation(gameState.campaign.currentLocation);
+      showChestAnimation();
+      return;
+    }
     if (choice.reward.removeCard) {
       gameState._upgradeMode = 'remove';
       gameState.phase = GAME_PHASES.CARD_UPGRADE;
@@ -793,6 +889,7 @@ function doEventChoice(index) {
     if (choice.reward.cardReward) {
       const biome = WORLD.locations[gameState.campaign.currentLocation]?.biome;
       gameState._rewardCards = getBiomeRewardCards(biome, choice.reward.cardCount || 3);
+      gameState._rewardSkippable = true;
       gameState.phase = GAME_PHASES.CARD_REWARD;
       clearLocation(gameState.campaign.currentLocation);
       renderGame();
@@ -803,6 +900,38 @@ function doEventChoice(index) {
   addLog(choice.result);
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
+}
+
+// === CHEST ANIMATION ===
+
+function showChestAnimation() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen chest-screen">
+      <div class="chest-container" onclick="openChest()">
+        <div class="chest" id="chest">
+          <div class="chest-base"><img src="images/chest_sea.png" alt="chest" class="chest-img"></div>
+          <div class="chest-glow"></div>
+        </div>
+        <p class="chest-prompt">Tap to open</p>
+      </div>
+      ${gameState._chestResult ? `<p class="chest-result-text">${gameState._chestResult}</p>` : ''}
+    </div>
+  `;
+}
+
+function openChest() {
+  const chest = document.getElementById('chest');
+  if (!chest || chest.classList.contains('chest-opened')) return;
+  chest.classList.add('chest-opened');
+
+  // After animation, transition to card reward screen
+  setTimeout(() => {
+    gameState._rewardLabel = 'Chest Opened';
+    gameState._rewardTitle = 'Choose Your Treasure';
+    gameState.phase = GAME_PHASES.CARD_REWARD;
+    renderGame();
+  }, 1200);
 }
 
 // === NPC DIALOGUE ===
@@ -818,7 +947,7 @@ function renderNpc() {
 
   return `
     <div class="screen npc-screen">
-      <div class="npc-portrait" style="${npc.image ? `background-image: url('${npc.image}')` : ''}">${npc.image ? '' : (npc.icon || '👤')}</div>
+      <div class="npc-portrait" style="${npc.image ? `background-image: url('${npc.image}')` : ''}">${npc.image ? '' : (npc.icon || icon('speech', 32, '#c8a96e'))}</div>
       <div class="npc-name">${npc.name}</div>
       <div class="npc-text">${currentLine}</div>
       <div class="npc-buttons">
@@ -837,7 +966,25 @@ function advanceDialogue() {
 }
 
 function leaveNpc() {
-  clearLocation(gameState.campaign.currentLocation);
+  const npc = gameState._currentNpc;
+  const locId = gameState.campaign.currentLocation;
+
+  // Grant NPC reward card if conditions were met
+  if (npc && npc._grantReward) {
+    const card = getRareCardByKey(npc._grantReward);
+    if (card) {
+      gameState.player.deck.push(card);
+      addLog(`Received: ${card.name}!`);
+      showNotification(`+ ${card.name}`, 'card');
+    }
+    // Track that this reward was collected so it's not given again
+    if (!gameState.campaign.npcRewardsCollected) {
+      gameState.campaign.npcRewardsCollected = new Set();
+    }
+    gameState.campaign.npcRewardsCollected.add(locId);
+  }
+
+  clearLocation(locId);
   returnToMap();
 }
 

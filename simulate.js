@@ -29,7 +29,7 @@ global.showNotification = () => {};
 // Use vm.runInThisContext so top-level const/let become globals
 const vm = require('vm');
 const SRC_DIR = path.join(__dirname, 'js');
-const GAME_FILES = ['cards.js', 'ai.js', 'map.js', 'quests.js', 'game.js'];
+const GAME_FILES = ['icons.js', 'cards.js', 'ai.js', 'map.js', 'quests.js', 'game.js'];
 const UI_FILES = ['ui.js', 'map-ui.js'];
 
 for (const file of GAME_FILES) {

@@ -8,10 +8,10 @@ const INTENT_TYPES = {
 };
 
 const INTENT_ICONS = {
-  [INTENT_TYPES.ATTACK]: '⚔️',
-  [INTENT_TYPES.DEFEND]: '🛡️',
-  [INTENT_TYPES.BUFF]: '✨',
-  [INTENT_TYPES.HEAVY_ATTACK]: '💥',
+  [INTENT_TYPES.ATTACK]: icon('crossed-swords', 18, '#e05555'),
+  [INTENT_TYPES.DEFEND]: icon('shield', 18, '#5588dd'),
+  [INTENT_TYPES.BUFF]: icon('sparkles', 18, '#c8a96e'),
+  [INTENT_TYPES.HEAVY_ATTACK]: icon('heavy-attack', 18, '#ff4444'),
 };
 
 const AI_ENEMIES = [

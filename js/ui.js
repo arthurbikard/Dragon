@@ -18,6 +18,9 @@ function renderGame() {
     case GAME_PHASES.CARD_REWARD:
       app.innerHTML = renderCardReward();
       break;
+    case 'mini_boss_victory':
+      app.innerHTML = renderMiniBossVictory();
+      break;
     case GAME_PHASES.SHOP:
       app.innerHTML = renderShop();
       break;
@@ -48,7 +51,7 @@ function renderGame() {
   }
   // Clear save on game end, auto-save otherwise
   if (gameState.phase === GAME_PHASES.GAME_OVER || gameState.phase === GAME_PHASES.VICTORY || gameState.phase === GAME_PHASES.MENU) {
-    localStorage.removeItem('dragonSave');
+    localStorage.removeItem(getSaveKey());
   } else if (typeof saveGame === 'function') {
     saveGame();
   }
@@ -56,29 +59,88 @@ function renderGame() {
 
 // === MENU ===
 function renderMenu() {
+  const profiles = getProfiles();
+  const canCreate = profiles.length < MAX_PROFILES;
+
   return `
     <div class="screen menu-screen" style="background-image: url('images/menu_bg.png')">
       <div class="menu-overlay">
         <h1 class="game-title">Dragon Cards</h1>
         <p class="game-subtitle">Enter the lair. Master the elements.</p>
-        <div class="menu-buttons">
-          <button class="btn btn-primary" onclick="startModeSelect('ai')">
-            Solo Campaign
-          </button>
-          <button class="btn btn-secondary" onclick="startModeSelect('pvp')">
-            Local Duel
-          </button>
+        <div class="profile-list">
+          ${profiles.map(p => {
+            const hasSave = hasSaveData(p.id);
+            const locName = p.location && WORLD.locations[p.location] ? WORLD.locations[p.location].name : '';
+            const info = hasSave
+              ? `${icon('heart', 12, '#e05555')} ${p.hp || '?'}/${p.maxHp || '?'} ${icon('coins', 12, '#c8a96e')} ${p.gold || 0} — ${locName}`
+              : 'No active campaign';
+            return `
+              <div class="profile-slot">
+                <button class="profile-btn ${hasSave ? 'profile-has-save' : ''}" onclick="loadProfile('${p.id}')">
+                  <span class="profile-name">${p.name}</span>
+                  <span class="profile-info">${info}</span>
+                  <span class="profile-action">${hasSave ? 'Continue' : 'New Game'}</span>
+                </button>
+                <button class="profile-delete" onclick="confirmDeleteProfile('${p.id}')" title="Delete">&times;</button>
+              </div>
+            `;
+          }).join('')}
+          ${canCreate ? `
+            <button class="profile-btn profile-new" onclick="promptNewProfile()">
+              + New Player
+            </button>
+          ` : ''}
         </div>
+        <button class="btn btn-secondary" onclick="startModeSelect('pvp')" style="margin-top: 8px">
+          Local Duel
+        </button>
         <div class="version-bar">
           <span class="version-text">v${GAME_VERSION}</span>
           <button class="version-reload" onclick="hardReload()">↻ Update</button>
           <button class="version-reload" onclick="toggleDevMode()" id="devModeBtn">
-            ${MAP_DEBUG ? '🔧 Dev: ON' : '🔧 Dev'}
+            ${MAP_DEBUG ? icon('wrench', 14) + ' Dev: ON' : icon('wrench', 14) + ' Dev'}
           </button>
         </div>
       </div>
     </div>
   `;
+}
+
+function promptNewProfile() {
+  const name = prompt('Enter your name:');
+  if (!name || !name.trim()) return;
+  const profile = createProfile(name.trim());
+  selectProfile(profile.id);
+  startModeSelect('ai');
+}
+
+function loadProfile(id) {
+  selectProfile(id);
+  if (hasSaveData(id)) {
+    if (restoreGame()) {
+      renderGame();
+      if (gameState.phase === GAME_PHASES.MAP) {
+        requestAnimationFrame(() => {
+          renderWorldPaths();
+          scrollToCurrentLocation();
+          initDragListeners();
+        });
+      }
+      return;
+    }
+  }
+  // No save — start new game
+  startModeSelect('ai');
+}
+
+function confirmDeleteProfile(id) {
+  const profiles = getProfiles();
+  const p = profiles.find(pr => pr.id === id);
+  if (!p) return;
+  if (confirm(`Delete "${p.name}" and their save data?`)) {
+    deleteProfile(id);
+    renderGame();
+  }
 }
 
 function toggleDevMode() {
@@ -181,7 +243,7 @@ function renderCombatantPortrait(image, element, size) {
   }
   const bg = element ? ELEMENT_COLORS[element].bg : '#333';
   return `<div class="combatant-portrait ${sizeClass}" style="background: ${bg}">
-    <span class="portrait-fallback">${element ? ELEMENT_ICONS[element] : '🐉'}</span>
+    <span class="portrait-fallback">${element ? ELEMENT_ICONS[element] : icon('dragon', 32, '#c8a96e')}</span>
   </div>`;
 }
 
@@ -210,7 +272,7 @@ function renderEnemyArea(e) {
         <div class="combatant-header">
           <span class="combatant-name">${label}</span>
           ${renderStatuses(e)}
-          ${e.block > 0 ? `<span class="block-badge">🛡 ${e.block}</span>` : ''}
+          ${e.block > 0 ? `<span class="block-badge">${icon('shield', 14, '#5588dd')} ${e.block}</span>` : ''}
         </div>
         <div class="hp-row">
           <div class="hp-bar-container">
@@ -259,7 +321,7 @@ function renderPlayerBar(p, canAct) {
         <div class="combatant-header">
           <span class="combatant-name">${label}</span>
           ${renderStatuses(p)}
-          ${p.block > 0 ? `<span class="block-badge">🛡 ${p.block}</span>` : ''}
+          ${p.block > 0 ? `<span class="block-badge">${icon('shield', 14, '#5588dd')} ${p.block}</span>` : ''}
         </div>
         <div class="hp-row">
           <div class="hp-bar-container">
@@ -289,7 +351,7 @@ function renderEnergy(energy) {
 function renderStatuses(actor) {
   if (!actor.statuses.length) return '';
   return `<div class="statuses">${actor.statuses.map(s => {
-    const icons = { burn: '🔥', thorns: '🌿', vulnerable: '💔', strength: '💪', weak: '😵' };
+    const icons = { burn: icon('fire', 12, '#e05555'), thorns: icon('thorns', 12, '#88cc88'), vulnerable: icon('broken-heart', 12, '#cc5588'), strength: icon('muscle', 12, '#e0a030'), weak: icon('dizzy', 12, '#8888aa') };
     return `<span class="status-badge status-${s.type}" title="${s.type}: ${s.value} (${s.duration} turns)">${icons[s.type] || '?'} ${s.value}</span>`;
   }).join('')}</div>`;
 }
@@ -309,37 +371,37 @@ function renderCardBadges(card) {
 
   // Damage badge
   if (card.damage > 0) {
-    badges.push(`<span class="card-badge badge-damage">⚔ ${card.damage}</span>`);
+    badges.push(`<span class="card-badge badge-damage">${icon('crossed-swords', 12, '#e05555')} ${card.damage}</span>`);
   }
 
   // Block badge
   if (card.block > 0) {
-    badges.push(`<span class="card-badge badge-block">🛡 ${card.block}</span>`);
+    badges.push(`<span class="card-badge badge-block">${icon('shield', 12, '#5588dd')} ${card.block}</span>`);
   }
 
   // Effect badges
   for (const fx of card.effects) {
     switch (fx.type) {
       case 'burn':
-        badges.push(`<span class="card-badge badge-burn">🔥 ${fx.value}<small>${fx.duration}t</small></span>`);
+        badges.push(`<span class="card-badge badge-burn">${icon('fire', 12, '#e05555')} ${fx.value}<small>${fx.duration}t</small></span>`);
         break;
       case 'heal':
-        badges.push(`<span class="card-badge badge-heal">💚 ${fx.value}</span>`);
+        badges.push(`<span class="card-badge badge-heal">${icon('heal', 12, '#55cc55')} ${fx.value}</span>`);
         break;
       case 'draw':
-        badges.push(`<span class="card-badge badge-draw">🃏 ${fx.value}</span>`);
+        badges.push(`<span class="card-badge badge-draw">${icon('card-draw', 12, '#c8a96e')} ${fx.value}</span>`);
         break;
       case 'gainEnergy':
-        badges.push(`<span class="card-badge badge-energy">⚡ ${fx.value}</span>`);
+        badges.push(`<span class="card-badge badge-energy">${icon('lightning', 12, '#ddcc44')} ${fx.value}</span>`);
         break;
       case 'thorns':
-        badges.push(`<span class="card-badge badge-thorns">🌿 ${fx.value}<small>${fx.duration}t</small></span>`);
+        badges.push(`<span class="card-badge badge-thorns">${icon('thorns', 12, '#88cc88')} ${fx.value}<small>${fx.duration}t</small></span>`);
         break;
       case 'vulnerable':
-        badges.push(`<span class="card-badge badge-vuln">💔 ${fx.duration}t</span>`);
+        badges.push(`<span class="card-badge badge-vuln">${icon('broken-heart', 12, '#cc5588')} ${fx.duration}t</span>`);
         break;
       case 'cleanse':
-        badges.push(`<span class="card-badge badge-cleanse">✨</span>`);
+        badges.push(`<span class="card-badge badge-cleanse">${icon('sparkles', 12, '#ddddff')}</span>`);
         break;
     }
   }
@@ -357,7 +419,7 @@ function renderCard(card, index, canAct) {
     <div class="card ${selected ? 'card-selected' : ''} ${!affordable ? 'card-unaffordable' : ''} card-${card.type}"
          onclick="${inHand ? `selectCard(${index})` : ''}">
       <div class="card-art" style="${card.image ? `background-image: url('${card.image}')` : `background: ${elementColor.bg}`}">
-        ${card.image ? '' : `<span class="card-art-icon">${card.element ? ELEMENT_ICONS[card.element] : '🐉'}</span>`}
+        ${card.image ? '' : `<span class="card-art-icon">${card.element ? ELEMENT_ICONS[card.element] : icon('dragon', 32, '#c8a96e')}</span>`}
       </div>
       <div class="card-cost">${card.cost}</div>
       <div class="card-info">
@@ -392,11 +454,19 @@ function renderBottomBar(actor, canAct) {
 // === CARD REWARD ===
 function renderCardReward() {
   const cards = gameState._rewardCards || [];
+  const label = gameState._rewardLabel || 'Dragon Slain';
+  const title = gameState._rewardTitle || 'Claim Your Spoils';
+  // Clean up custom labels after use
+  const skippable = gameState._rewardSkippable;
+  delete gameState._rewardLabel;
+  delete gameState._rewardTitle;
+  delete gameState._chestResult;
+  delete gameState._rewardSkippable;
   return `
     <div class="screen reward-screen">
       <div class="reward-header">
-        <div class="reward-label">Dragon Slain</div>
-        <h2>Claim Your Spoils</h2>
+        <div class="reward-label">${label}</div>
+        <h2>${title}</h2>
         <div class="battle-progress">Battle ${gameState.battleIndex + 1} of 3</div>
       </div>
       <div class="reward-cards">
@@ -406,9 +476,51 @@ function renderCardReward() {
           </div>
         `).join('')}
       </div>
-      <button class="btn btn-skip" onclick="skipReward()">Leave it</button>
+      ${skippable ? '<button class="btn btn-skip" onclick="skipReward()">Leave it</button>' : ''}
     </div>
   `;
+}
+
+// === MINI-BOSS VICTORY ===
+function renderMiniBossVictory() {
+  const mbv = gameState._miniBossVictory;
+  if (!mbv) return '';
+  return `
+    <div class="screen mini-boss-victory-screen">
+      <h2 class="screen-title">${mbv.title}</h2>
+      <div class="mbv-story">
+        ${mbv.lines.map(l => `<p>${l}</p>`).join('')}
+      </div>
+      <div class="mbv-reward">
+        <div class="mbv-reward-name">${mbv.reward}</div>
+        <div class="mbv-reward-desc">${mbv.rewardDesc}</div>
+      </div>
+      <button class="btn btn-primary" onclick="continueAfterMiniBoss()">Continue</button>
+    </div>
+  `;
+}
+
+function continueAfterMiniBoss() {
+  const biomeId = gameState._pendingRewardBiome;
+  const loc = gameState._pendingRewardLoc;
+  delete gameState._miniBossVictory;
+  delete gameState._pendingRewardBiome;
+  delete gameState._pendingRewardLoc;
+
+  // Generate card rewards as normal
+  if (loc && loc.specialReward) {
+    const specialCard = getRareCardByKey(loc.specialReward);
+    if (specialCard) {
+      const filler = getBiomeRewardCards(biomeId, 2);
+      gameState._rewardCards = shuffleArray([specialCard, ...filler]);
+    } else {
+      gameState._rewardCards = getBiomeRewardCards(biomeId, 3);
+    }
+  } else {
+    gameState._rewardCards = getBiomeRewardCards(biomeId, 3);
+  }
+  gameState.phase = GAME_PHASES.CARD_REWARD;
+  renderGame();
 }
 
 // === PASS DEVICE ===
@@ -416,7 +528,7 @@ function renderPassDevice() {
   const nextPlayer = gameState._nextTurn === 'player' ? 'Player 1' : 'Player 2';
   return `
     <div class="screen pass-screen">
-      <div class="pass-icon">⚔</div>
+      <div class="pass-icon">${icon('crossed-swords', 40, '#c8a96e')}</div>
       <h2>Pass the device to</h2>
       <h1 class="pass-player">${nextPlayer}</h1>
       <p>Tap when ready to fight</p>
@@ -436,13 +548,13 @@ function renderPvpResolve() {
       <div class="resolve-columns">
         <div class="resolve-col">
           <div class="resolve-col-header">Player 1</div>
-          <div class="resolve-stat">${p1.damage > 0 ? `<span class="card-badge badge-damage">⚔ ${p1.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
+          <div class="resolve-stat">${p1.damage > 0 ? `<span class="card-badge badge-damage">${icon('crossed-swords', 12, '#e05555')} ${p1.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
           ${p1.effects.map(e => `<div class="resolve-stat"><span class="card-badge badge-${e.type}">${describeEffect(e)}</span></div>`).join('')}
         </div>
         <div class="resolve-vs">VS</div>
         <div class="resolve-col">
           <div class="resolve-col-header">Player 2</div>
-          <div class="resolve-stat">${p2.damage > 0 ? `<span class="card-badge badge-damage">⚔ ${p2.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
+          <div class="resolve-stat">${p2.damage > 0 ? `<span class="card-badge badge-damage">${icon('crossed-swords', 12, '#e05555')} ${p2.damage}</span>` : '<span class="resolve-none">—</span>'}</div>
           ${p2.effects.map(e => `<div class="resolve-stat"><span class="card-badge badge-${e.type}">${describeEffect(e)}</span></div>`).join('')}
         </div>
       </div>
@@ -540,17 +652,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.hidden && typeof saveGame === 'function') saveGame();
   });
 
-  // Try to restore saved game
-  if (restoreGame()) {
-    renderGame();
-    if (gameState.phase === GAME_PHASES.MAP) {
-      requestAnimationFrame(() => {
-        renderWorldPaths();
-        scrollToCurrentLocation();
-        initDragListeners();
-      });
-    }
-    return;
-  }
+  // Migrate old single-profile save if needed
+  migrateOldSave();
+
+  // Show menu (profiles screen)
   renderGame();
 });

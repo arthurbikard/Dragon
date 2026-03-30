@@ -299,6 +299,12 @@ function playCard(index) {
     return;
   }
 
+  // Auto-end turn if no playable cards remain
+  if (!isPVP && !actor.hand.some(c => c.cost <= actor.energy)) {
+    endTurn();
+    return;
+  }
+
   renderGame();
 }
 
@@ -596,7 +602,20 @@ function handleDeath() {
           renderGame();
           return;
         }
-        // Otherwise grant blessing and continue
+        // Show mini-boss victory screen with lore + rewards before card pick
+        if (loc.miniBossVictory) {
+          const mbv = loc.miniBossVictory;
+          if (mbv.maxHpBonus) {
+            gameState.player.maxHp += mbv.maxHpBonus;
+            gameState.player.hp += mbv.maxHpBonus;
+          }
+          gameState._miniBossVictory = mbv;
+          gameState._pendingRewardBiome = loc.biome;
+          gameState._pendingRewardLoc = loc;
+          gameState.phase = 'mini_boss_victory';
+          renderGame();
+          return;
+        }
       }
 
       // Ambush battles: no card reward, just return to map
@@ -610,17 +629,18 @@ function handleDeath() {
       // Generate rewards based on biome
       const biomeId = loc ? loc.biome : null;
 
-      // Special reward (e.g. lighthouse)
+      // Special reward (e.g. lighthouse flame) — offer as a choice among weaker cards
       if (loc && loc.specialReward) {
         const specialCard = getRareCardByKey(loc.specialReward);
         if (specialCard) {
-          gameState.player.deck.push(specialCard);
-          addLog(`Found: ${specialCard.name}!`);
-          if (typeof showNotification === 'function') showNotification(`+ ${specialCard.name}`, 'card');
+          const filler = getBiomeRewardCards(biomeId, 2);
+          gameState._rewardCards = shuffleArray([specialCard, ...filler]);
+        } else {
+          gameState._rewardCards = getBiomeRewardCards(biomeId, 3);
         }
-      }
-
-      if (gameState._battleIsElite) {
+        gameState.campaign.gold += 10;
+        addLog('Elite defeated! Bonus gold earned.');
+      } else if (gameState._battleIsElite) {
         gameState._rewardCards = [getRareCard(), getRareCard(), ...getBiomeRewardCards(biomeId, 1)];
         gameState.campaign.gold += 10;
         addLog('Elite defeated! Bonus gold earned.');
@@ -672,12 +692,59 @@ function addLog(msg) {
 }
 
 function returnToMenu() {
+  localStorage.removeItem(getSaveKey());
   gameState = createGameState();
-  localStorage.removeItem('dragonSave');
+  currentProfile = null;
   renderGame();
 }
 
-// === SAVE / RESTORE ===
+// === PROFILES & SAVE / RESTORE ===
+
+var currentProfile = null; // { id, name }
+const MAX_PROFILES = 4;
+
+function getProfiles() {
+  try {
+    const raw = localStorage.getItem('dragonProfiles');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function saveProfiles(profiles) {
+  localStorage.setItem('dragonProfiles', JSON.stringify(profiles));
+}
+
+function createProfile(name) {
+  const profiles = getProfiles();
+  const id = 'p' + Date.now();
+  const profile = { id, name, created: Date.now() };
+  profiles.push(profile);
+  saveProfiles(profiles);
+  return profile;
+}
+
+function deleteProfile(id) {
+  let profiles = getProfiles();
+  profiles = profiles.filter(p => p.id !== id);
+  saveProfiles(profiles);
+  localStorage.removeItem('dragonSave_' + id);
+  if (currentProfile && currentProfile.id === id) {
+    currentProfile = null;
+  }
+}
+
+function selectProfile(id) {
+  const profiles = getProfiles();
+  currentProfile = profiles.find(p => p.id === id) || null;
+}
+
+function getSaveKey() {
+  return currentProfile ? 'dragonSave_' + currentProfile.id : 'dragonSave';
+}
+
+function hasSaveData(profileId) {
+  return !!localStorage.getItem('dragonSave_' + profileId);
+}
 
 function saveGame() {
   // Only save during an active campaign (not menu, not mid-battle)
@@ -690,13 +757,27 @@ function saveGame() {
     return value;
   }));
   try {
-    localStorage.setItem('dragonSave', JSON.stringify(save));
+    localStorage.setItem(getSaveKey(), JSON.stringify(save));
+    // Update profile's last-played info
+    if (currentProfile) {
+      const profiles = getProfiles();
+      const p = profiles.find(pr => pr.id === currentProfile.id);
+      if (p) {
+        p.lastPlayed = Date.now();
+        p.element = gameState.player.element;
+        p.hp = gameState.player.hp;
+        p.maxHp = gameState.player.maxHp;
+        p.location = gameState.campaign.currentLocation;
+        p.gold = gameState.campaign.gold;
+        saveProfiles(profiles);
+      }
+    }
   } catch (e) { /* storage full — ignore */ }
 }
 
 function restoreGame() {
   try {
-    const raw = localStorage.getItem('dragonSave');
+    const raw = localStorage.getItem(getSaveKey());
     if (!raw) return false;
     const save = JSON.parse(raw, (key, value) => {
       if (value && value.__set) return new Set(value.__set);
@@ -713,4 +794,16 @@ function restoreGame() {
   } catch (e) {
     return false;
   }
+}
+
+// Migrate old single save to first profile
+function migrateOldSave() {
+  const old = localStorage.getItem('dragonSave');
+  if (!old) return;
+  const profiles = getProfiles();
+  if (profiles.length === 0) {
+    const profile = createProfile('Traveler');
+    localStorage.setItem('dragonSave_' + profile.id, old);
+  }
+  localStorage.removeItem('dragonSave');
 }

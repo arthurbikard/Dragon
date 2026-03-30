@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Image Stitcher</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a1a; color: #eee; font-family: sans-serif; padding: 10px; }
+  h2 { margin-bottom: 10px; }
+  .controls { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; padding: 10px; background: #2a2a2a; border-radius: 8px; }
+  .controls label { font-size: 14px; }
+  .controls input[type=range] { width: 150px; }
+  .controls input[type=number] { width: 70px; background: #333; color: #eee; border: 1px solid #555; padding: 4px; border-radius: 4px; }
+  button { background: #4a7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #5b8; }
+  #canvas-container { overflow: auto; border: 2px solid #444; border-radius: 8px; background: #000; position: relative; }
+  canvas { display: block; }
+  .info { font-size: 13px; color: #aaa; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h2>Image Stitcher</h2>
+
+<div class="controls">
+  <div>
+    <label>Right image X offset: <input type="number" id="offsetX" value="0"></label>
+    <input type="range" id="offsetXSlider" min="-500" max="3500" value="0">
+  </div>
+  <div>
+    <label>Right image Y offset: <input type="number" id="offsetY" value="0"></label>
+    <input type="range" id="offsetYSlider" min="-500" max="500" value="0">
+  </div>
+  <div>
+    <label>Crop right image left: <input type="number" id="cropLeft" value="0"></label>
+    <input type="range" id="cropLeftSlider" min="0" max="3000" value="0">
+  </div>
+  <div>
+    <label>Crop right image right: <input type="number" id="cropRight" value="0"></label>
+    <input type="range" id="cropRightSlider" min="0" max="3000" value="0">
+  </div>
+  <div>
+    <label>Crop right image top: <input type="number" id="cropTop" value="0"></label>
+    <input type="range" id="cropTopSlider" min="0" max="1000" value="0">
+  </div>
+  <div>
+    <label>Crop right image bottom: <input type="number" id="cropBottom" value="0"></label>
+    <input type="range" id="cropBottomSlider" min="0" max="1000" value="0">
+  </div>
+  <div>
+    <label>Zoom: <input type="number" id="zoom" value="25" min="5" max="100" step="5">%</label>
+    <input type="range" id="zoomSlider" min="5" max="100" value="25" step="5">
+  </div>
+  <div>
+    <label><input type="checkbox" id="showGuide" checked> Show seam guide</label>
+  </div>
+  <div id="copyValues" style="background:#333; padding:8px; border-radius:4px; font-family:monospace; font-size:14px; user-select:all; cursor:text;"></div>
+</div>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+</div>
+<p class="info" id="info"></p>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const imgLeft = new Image();
+const imgRight = new Image();
+let loaded = 0;
+
+imgLeft.onload = imgRight.onload = () => { if (++loaded === 2) { initSliders(); draw(); } };
+imgLeft.src = 'images/coast_map_bg_cropped.png';
+imgRight.src = 'images/Gemini_Generated_Image_bvdm46bvdm46bvdm.png';
+
+const fields = ['offsetX', 'offsetY', 'cropLeft', 'cropRight', 'cropTop', 'cropBottom', 'zoom'];
+
+function initSliders() {
+  // Set sensible defaults: place right image at left image's right edge
+  document.getElementById('offsetX').value = imgLeft.width;
+  document.getElementById('offsetXSlider').value = imgLeft.width;
+  document.getElementById('offsetXSlider').max = imgLeft.width + imgRight.width;
+
+  for (const f of fields) {
+    const input = document.getElementById(f);
+    const slider = document.getElementById(f + 'Slider');
+    input.addEventListener('input', () => { slider.value = input.value; draw(); });
+    slider.addEventListener('input', () => { input.value = slider.value; draw(); });
+  }
+  document.getElementById('showGuide').addEventListener('change', draw);
+}
+
+function getVals() {
+  const v = {};
+  for (const f of fields) v[f] = parseInt(document.getElementById(f).value) || 0;
+  v.showGuide = document.getElementById('showGuide').checked;
+  return v;
+}
+
+function draw() {
+  const v = getVals();
+  const zoom = v.zoom / 100;
+
+  // Crop region of right image
+  const srcX = v.cropLeft;
+  const srcY = v.cropTop;
+  const srcW = imgRight.width - v.cropLeft - v.cropRight;
+  const srcH = imgRight.height - v.cropTop - v.cropBottom;
+
+  if (srcW <= 0 || srcH <= 0) return;
+
+  // Canvas size = bounding box of both images
+  const rightX = v.offsetX;
+  const rightY = v.offsetY;
+
+  const totalW = Math.max(imgLeft.width, rightX + srcW);
+  const totalH = Math.max(imgLeft.height, rightY + srcH, imgLeft.height);
+
+  canvas.width = totalW * zoom;
+  canvas.height = totalH * zoom;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+
+  // Draw left image
+  ctx.drawImage(imgLeft, 0, 0, imgLeft.width * zoom, imgLeft.height * zoom);
+
+  // Draw cropped right image at offset
+  ctx.drawImage(imgRight, srcX, srcY, srcW, srcH,
+    rightX * zoom, rightY * zoom, srcW * zoom, srcH * zoom);
+
+  // Seam guide
+  if (v.showGuide) {
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    const guideX = imgLeft.width * zoom;
+    ctx.beginPath();
+    ctx.moveTo(guideX, 0);
+    ctx.lineTo(guideX, canvas.height);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)';
+    const guideX2 = rightX * zoom;
+    ctx.beginPath();
+    ctx.moveTo(guideX2, 0);
+    ctx.lineTo(guideX2, canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  document.getElementById('info').textContent =
+    `Left: ${imgLeft.width}×${imgLeft.height} | Right (cropped): ${srcW}×${srcH} | Total: ${totalW}×${totalH} | Overlap: ${Math.max(0, imgLeft.width - rightX)}px`;
+
+  document.getElementById('copyValues').textContent =
+    `offsetX=${v.offsetX} offsetY=${v.offsetY} cropLeft=${v.cropLeft} cropRight=${v.cropRight} cropTop=${v.cropTop} cropBottom=${v.cropBottom}`;
+}
+
+function exportRight() {
+  const v = getVals();
+  const srcX = v.cropLeft;
+  const srcY = v.cropTop;
+  const srcW = imgRight.width - v.cropLeft - v.cropRight;
+  const srcH = imgRight.height - v.cropTop - v.cropBottom;
+  if (srcW <= 0 || srcH <= 0) return;
+
+  // The right tile should match the left image height
+  // It starts at the seam (where left image ends) and goes to the end
+  const tileX = v.offsetX;  // where right image starts in the composite
+  const overlapWithLeft = Math.max(0, imgLeft.width - tileX);
+
+  // Export only the portion of the right image that extends beyond the left image
+  const exportSrcX = srcX + overlapWithLeft;
+  const exportSrcW = srcW - overlapWithLeft;
+  if (exportSrcW <= 0) { alert('Right image does not extend beyond left image. Reduce overlap.'); return; }
+
+  const expCanvas = document.createElement('canvas');
+  expCanvas.width = exportSrcW;
+  expCanvas.height = imgLeft.height;
+  const ectx = expCanvas.getContext('2d');
+
+  // Draw the non-overlapping part of the right image, aligned vertically
+  ectx.drawImage(imgRight, exportSrcX, srcY, exportSrcW, srcH, 0, v.offsetY, exportSrcW, srcH);
+
+  const dataUrl = expCanvas.toDataURL('image/png');
+  const w = window.open('');
+  w.document.write('<img src="' + dataUrl + '">');
+  w.document.title = 'Right click to save: coast_map_bg_right.png';
+}
+
+function exportImage() {
+  const v = getVals();
+  const srcX = v.cropLeft;
+  const srcY = v.cropTop;
+  const srcW = imgRight.width - v.cropLeft - v.cropRight;
+  const srcH = imgRight.height - v.cropTop - v.cropBottom;
+  if (srcW <= 0 || srcH <= 0) return;
+
+  const rightX = v.offsetX;
+  const rightY = v.offsetY;
+  const totalW = Math.max(imgLeft.width, rightX + srcW);
+  const totalH = Math.max(imgLeft.height, rightY + srcH, imgLeft.height);
+
+  // Full resolution export
+  const expCanvas = document.createElement('canvas');
+  expCanvas.width = totalW;
+  expCanvas.height = totalH;
+  const ectx = expCanvas.getContext('2d');
+
+  ectx.drawImage(imgLeft, 0, 0);
+  ectx.drawImage(imgRight, srcX, srcY, srcW, srcH, rightX, rightY, srcW, srcH);
+
+  const dataUrl = expCanvas.toDataURL('image/png');
+  const w = window.open('');
+  w.document.write('<img src="' + dataUrl + '">');
+  w.document.title = 'Right click to save: coast_map_bg_stitched.png';
+}
+</script>
+</body>
+</html>

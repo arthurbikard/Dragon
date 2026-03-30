@@ -22,10 +22,10 @@ const ELEMENT_STRENGTH = {
 };
 
 const ELEMENT_ICONS = {
-  [ELEMENTS.FIRE]: '🔥',
-  [ELEMENTS.WATER]: '🌊',
-  [ELEMENTS.EARTH]: '🪨',
-  [ELEMENTS.AIR]: '💨',
+  [ELEMENTS.FIRE]: icon('fire', 16, '#e05555'),
+  [ELEMENTS.WATER]: icon('water', 16, '#5588dd'),
+  [ELEMENTS.EARTH]: icon('earth', 16, '#aa8844'),
+  [ELEMENTS.AIR]: icon('air', 16, '#88bbdd'),
 };
 
 const ELEMENT_COLORS = {
