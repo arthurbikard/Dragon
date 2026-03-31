@@ -948,8 +948,8 @@ function simulateGame(agent, element, ablation) {
     _activeAblation = ablation ? ablation.name : null;
     _simVisited = new Set();
     // Reset scripted routes
-    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; AGENTS.optimal._lastShopVisited = null; AGENTS.optimal._lastHealVisit = null; }
-    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; AGENTS.lookahead._lastHealVisit = null; }
+    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; }
+    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; }
     if (ablation && ablation.apply) ablation.apply();
 
 
@@ -1321,6 +1321,18 @@ function simulateMapTurn(agent, stats) {
       return;
     }
 
+    // Re-enter cleared shops/rest when the agent needs healing
+    if (currentLoc.type === LOC_TYPES.SHOP && gameState.player.hp < gameState.player.maxHp && campaign.gold >= SHOP_HEAL_PRICE) {
+      gameState._shopCards = getAvailableShopCards();
+      gameState.phase = GAME_PHASES.SHOP;
+      return;
+    }
+    if (currentLoc.type === LOC_TYPES.REST && canRest() && gameState.player.hp < gameState.player.maxHp * 0.7) {
+      _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
+      doRest();
+      return;
+    }
+
     // Location is cleared — navigate to next
     const connections = (currentLoc.paths || []).filter(id => canTravelTo(id));
 
@@ -1352,6 +1364,25 @@ function simulateMapTurn(agent, stats) {
   }
 }
 
+// BFS to find nearest location matching a predicate, only through explored nodes
+function _findNearest(fromId, explored, predicate) {
+  const visited = new Set([fromId]);
+  const queue = [fromId];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id !== fromId && predicate(id)) return id;
+    const loc = WORLD.locations[id];
+    if (!loc || !loc.paths) continue;
+    for (const nextId of loc.paths) {
+      if (!visited.has(nextId) && explored.has(nextId)) {
+        visited.add(nextId);
+        queue.push(nextId);
+      }
+    }
+  }
+  return null;
+}
+
 function pickDestination(agent, connections) {
   if (connections.length === 0) return null;
   if (connections.length === 1) return connections[0];
@@ -1372,69 +1403,82 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // Smart diversion: check for adjacent heal/shop opportunities before following route
+  // === Goal-based navigation for scripted route agents ===
   if (agent._route) {
-    const needsHeal = hpRatio < 0.5;
-    const wantsShop = campaign.gold >= 15;
+    // Pick a goal based on priorities
+    let goalId = null;
 
-    // When HP is low, divert to adjacent rest (if usable) or shop (if can afford heal)
-    if (needsHeal) {
-      const healable = connections.filter(id => {
-        if (id === agent._lastHealVisit) return false; // don't revisit same heal location
+    // Priority 1: Low HP + has gold → find nearest known shop to heal
+    if (hpRatio < 0.5 && campaign.gold >= SHOP_HEAL_PRICE) {
+      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
         const loc = WORLD.locations[id];
-        if (!loc) return false;
-        if (loc.type === LOC_TYPES.REST && canRest()) return true;
-        if (loc.type === LOC_TYPES.SHOP && campaign.gold >= SHOP_HEAL_PRICE && !campaign.cleared.has(id)) return true;
-        return false;
+        return loc && loc.type === LOC_TYPES.SHOP;
       });
-      if (healable.length > 0) {
-        agent._lastHealVisit = healable[0];
-        return healable[0];
+    }
+
+    // Priority 2: Low HP → find nearest rest site (if can rest)
+    if (!goalId && hpRatio < 0.5 && canRest()) {
+      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
+        const loc = WORLD.locations[id];
+        return loc && loc.type === LOC_TYPES.REST;
+      });
+    }
+
+    // Priority 3: Has gold → find nearest shop to spend
+    if (!goalId && campaign.gold >= 15) {
+      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
+        const loc = WORLD.locations[id];
+        return loc && loc.type === LOC_TYPES.SHOP;
+      });
+    }
+
+    // Priority 4: Follow scripted route, but skip mini-boss/elite if HP < 60%
+    if (!goalId && agent._routeIndex < agent._route.length) {
+      while (agent._routeIndex < agent._route.length) {
+        const target = agent._route[agent._routeIndex];
+        const targetLoc = WORLD.locations[target];
+        // Skip dangerous fights when low HP
+        if (targetLoc && hpRatio < 0.6 &&
+            [LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS, LOC_TYPES.ELITE].includes(targetLoc.type) &&
+            !campaign.cleared.has(target)) {
+          // Don't skip — just set as goal, the agent will heal before arriving if possible
+          goalId = target;
+          break;
+        }
+        goalId = target;
+        break;
       }
     }
 
-    // When flush with gold, visit adjacent shop (but not the same one twice in a row)
-    if (wantsShop && !needsHeal) {
-      const shops = connections.filter(id => {
-        const loc = WORLD.locations[id];
-        return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
+    // Priority 5: Explore unvisited locations
+    if (!goalId) {
+      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
+        return !campaign.visited.has(id);
       });
-      if (shops.length > 0) {
-        agent._lastShopVisited = shops[0];
-        return shops[0];
-      }
     }
-  }
 
-  // Scripted route agents
-  if (agent._route) {
-    // Find the next destination in the route that we can travel to
-    while (agent._routeIndex < agent._route.length) {
-      const target = agent._route[agent._routeIndex];
-      if (connections.includes(target)) {
-        agent._routeIndex++;
-        return target;
+    // Navigate toward goal
+    if (goalId) {
+      if (connections.includes(goalId)) {
+        // Advance route if this was the route target
+        if (agent._routeIndex < agent._route.length && agent._route[agent._routeIndex] === goalId) {
+          agent._routeIndex++;
+        }
+        return goalId;
       }
-      // Target not directly reachable — try to pathfind toward it
-      // Pick the connection closest to the target in the route
-      const targetLoc = WORLD.locations[target];
-      if (targetLoc) {
-        let bestConn = null;
-        let bestDist = Infinity;
+      // Pathfind: pick connection closest to goal
+      const goalLoc = WORLD.locations[goalId];
+      if (goalLoc) {
+        let bestConn = null, bestDist = Infinity;
         for (const connId of connections) {
           const connLoc = WORLD.locations[connId];
           if (!connLoc) continue;
-          const dx = connLoc.x - targetLoc.x;
-          const dy = connLoc.y - targetLoc.y;
-          const dist = dx * dx + dy * dy;
-          if (dist < bestDist) { bestDist = dist; bestConn = connId; }
+          const dx = connLoc.x - goalLoc.x, dy = connLoc.y - goalLoc.y;
+          if (dx * dx + dy * dy < bestDist) { bestDist = dx * dx + dy * dy; bestConn = connId; }
         }
         if (bestConn) return bestConn;
       }
-      // Can't reach this target at all, skip it
-      agent._routeIndex++;
     }
-    // Route exhausted — fall through to scored navigation
   }
 
   // Fallback: score-based navigation
