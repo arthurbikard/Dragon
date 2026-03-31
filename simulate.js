@@ -948,8 +948,8 @@ function simulateGame(agent, element, ablation) {
     _activeAblation = ablation ? ablation.name : null;
     _simVisited = new Set();
     // Reset scripted routes
-    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; }
-    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; }
+    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; AGENTS.optimal._goal = null; }
+    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._goal = null; }
     if (ablation && ablation.apply) ablation.apply();
 
 
@@ -1050,18 +1050,21 @@ function simulateGame(agent, element, ablation) {
           continue;
         }
 
-        // Remove filler cards if affordable
+        // Remove weak cards: filler first, then weakest if deck is bloated
         const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
-        const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
-        if (hasFiller && gold >= CARD_REMOVE_PRICE) {
-          _hlog(stats, 'shop', { ..._snap(), action: 'remove' });
-          openShopRemove();
-          continue;
+        if (gold >= CARD_REMOVE_PRICE) {
+          const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+          const deckBloated = allCards.length > 12;
+          if (hasFiller || deckBloated) {
+            _hlog(stats, 'shop', { ..._snap(), action: 'remove' });
+            openShopRemove();
+            continue;
+          }
         }
 
-        // Try to buy a card
+        // Try to buy a card — only if deck is lean enough
         const items = gameState._shopCards || [];
-        const pick = agent.pickShopCard(items, gold);
+        const pick = allCards.length <= 14 ? agent.pickShopCard(items, gold) : -1;
         if (pick >= 0) {
           const before = gameState.campaign.gold;
           _hlog(stats, 'shop', { ..._snap(), action: 'buy', card: items[pick].card.name });
@@ -1086,20 +1089,28 @@ function simulateGame(agent, element, ablation) {
         const hasUpgradeable = gameState.player.deck.some(c => !c.upgraded);
         const deckSize = gameState.player.deck.length + gameState.player.discard.length;
 
+        const canAffordRemove = campaign.gold >= CARD_REMOVE_PRICE;
+        const canAffordUpgrade = campaign.gold >= CARD_UPGRADE_PRICE;
+
         if (hpRatio < 0.5) {
           _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
           doRest();
-        } else if (deckSize > 10 && hpRatio > 0.5) {
+        } else if (deckSize > 10 && canAffordRemove) {
+          // Deck too big — thin it
           _hlog(stats, 'rest', { ..._snap(), action: 'remove' });
           gameState._upgradeMode = 'remove';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
-        } else if (hasUpgradeable && hpRatio > 0.7) {
+        } else if (hasUpgradeable && canAffordUpgrade && hpRatio > 0.7) {
           _hlog(stats, 'rest', { ..._snap(), action: 'upgrade' });
           gameState._upgradeMode = 'upgrade';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
-        } else {
+        } else if (hpRatio < 0.8) {
           _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
           doRest();
+        } else {
+          // Full HP, nothing to spend on — just clear and go
+          clearLocation(gameState.campaign.currentLocation);
+          returnToMap();
         }
         continue;
       }
@@ -1155,11 +1166,22 @@ function simulateGame(agent, element, ablation) {
         }
 
         if (mode === 'remove') {
-          // Remove the weakest card (lowest damage + block)
+          // Remove the weakest card — score like deck strength but don't remove rare/legendary
           let weakIdx = 0;
           let weakScore = Infinity;
           cards.forEach((c, i) => {
-            const s = c.damage + c.block + c.effects.length * 3;
+            if (c.rarity === 'rare' || c.rarity === 'legendary') return; // never remove rare cards
+            let s = (c.damage || 0) * 1.0 + (c.block || 0) * 0.8;
+            for (const fx of (c.effects || [])) {
+              if (fx.type === 'burn') s += fx.value * (fx.duration || 1) * 1.5;
+              else if (fx.type === 'heal') s += fx.value * 1.8;
+              else if (fx.type === 'draw') s += fx.value * 3;
+              else if (fx.type === 'gainEnergy') s += fx.value * 4;
+              else s += 1.5;
+            }
+            if (c.upgraded) s *= 1.25;
+            const cost = c.cost || 1;
+            if (cost > 0 && c.damage > 0) s += (c.damage / cost) * 0.5;
             if (s < weakScore) { weakScore = s; weakIdx = i; }
           });
           doCardAction(weakIdx);
@@ -1321,16 +1343,20 @@ function simulateMapTurn(agent, stats) {
       return;
     }
 
-    // Re-enter cleared shops/rest when the agent needs healing
-    if (currentLoc.type === LOC_TYPES.SHOP && gameState.player.hp < gameState.player.maxHp && campaign.gold >= SHOP_HEAL_PRICE) {
-      gameState._shopCards = getAvailableShopCards();
-      gameState.phase = GAME_PHASES.SHOP;
-      return;
-    }
-    if (currentLoc.type === LOC_TYPES.REST && canRest() && gameState.player.hp < gameState.player.maxHp * 0.7) {
-      _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
-      doRest();
-      return;
+
+    // Re-enter cleared shop/rest if this was our goal destination
+    if (agent._goal === currentId || agent._goalJustReached === currentId) {
+      agent._goalJustReached = null;
+      if (currentLoc.type === LOC_TYPES.SHOP && campaign.gold >= SHOP_HEAL_PRICE) {
+        gameState._shopCards = getAvailableShopCards();
+        gameState.phase = GAME_PHASES.SHOP;
+        return;
+      }
+      if (currentLoc.type === LOC_TYPES.REST && canRest()) {
+        _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
+        doRest();
+        return;
+      }
     }
 
     // Location is cleared — navigate to next
@@ -1405,69 +1431,62 @@ function pickDestination(agent, connections) {
 
   // === Goal-based navigation for scripted route agents ===
   if (agent._route) {
-    // Pick a goal based on priorities
-    let goalId = null;
-
-    // Priority 1: Low HP + has gold → find nearest known shop to heal
-    if (hpRatio < 0.5 && campaign.gold >= SHOP_HEAL_PRICE) {
-      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
-        const loc = WORLD.locations[id];
-        return loc && loc.type === LOC_TYPES.SHOP;
-      });
-    }
-
-    // Priority 2: Low HP → find nearest rest site (if can rest)
-    if (!goalId && hpRatio < 0.5 && canRest()) {
-      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
-        const loc = WORLD.locations[id];
-        return loc && loc.type === LOC_TYPES.REST;
-      });
-    }
-
-    // Priority 3: Has gold → find nearest shop to spend
-    if (!goalId && campaign.gold >= 15) {
-      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
-        const loc = WORLD.locations[id];
-        return loc && loc.type === LOC_TYPES.SHOP;
-      });
-    }
-
-    // Priority 4: Follow scripted route, but skip mini-boss/elite if HP < 60%
-    if (!goalId && agent._routeIndex < agent._route.length) {
-      while (agent._routeIndex < agent._route.length) {
-        const target = agent._route[agent._routeIndex];
-        const targetLoc = WORLD.locations[target];
-        // Skip dangerous fights when low HP
-        if (targetLoc && hpRatio < 0.6 &&
-            [LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS, LOC_TYPES.ELITE].includes(targetLoc.type) &&
-            !campaign.cleared.has(target)) {
-          // Don't skip — just set as goal, the agent will heal before arriving if possible
-          goalId = target;
-          break;
-        }
-        goalId = target;
-        break;
+    // Check if current committed goal is still valid
+    if (agent._goal) {
+      if (agent._goal === campaign.currentLocation) {
+        agent._goalJustReached = agent._goal;
+        agent._goal = null;
       }
     }
 
-    // Priority 5: Explore unvisited locations
-    if (!goalId) {
-      goalId = _findNearest(campaign.currentLocation, campaign.explored, id => {
-        return !campaign.visited.has(id);
-      });
+    // Set a new goal if we don't have one, or override for urgent needs
+    if (!agent._goal) {
+      // Gold >= 20 → find shop to spend
+      if (campaign.gold >= 20) {
+        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
+          const loc = WORLD.locations[id];
+          return loc && loc.type === LOC_TYPES.SHOP && id !== campaign.currentLocation;
+        });
+      }
+      // Low HP + has gold → shop for heals
+      if (!agent._goal && hpRatio < 0.5 && campaign.gold >= SHOP_HEAL_PRICE) {
+        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
+          const loc = WORLD.locations[id];
+          return loc && loc.type === LOC_TYPES.SHOP && id !== campaign.currentLocation;
+        });
+      }
+      // Low HP → rest
+      if (!agent._goal && hpRatio < 0.5 && canRest()) {
+        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
+          const loc = WORLD.locations[id];
+          return loc && loc.type === LOC_TYPES.REST && id !== campaign.currentLocation;
+        });
+      }
+    }
+
+    // Default goal: follow scripted route
+    if (!agent._goal && agent._routeIndex < agent._route.length) {
+      agent._goal = agent._route[agent._routeIndex];
+    }
+
+    // Fallback: explore unvisited
+    if (!agent._goal) {
+      agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => !campaign.visited.has(id));
     }
 
     // Navigate toward goal
-    if (goalId) {
-      if (connections.includes(goalId)) {
+    if (agent._goal) {
+      if (connections.includes(agent._goal)) {
+        const dest = agent._goal;
         // Advance route if this was the route target
-        if (agent._routeIndex < agent._route.length && agent._route[agent._routeIndex] === goalId) {
+        if (agent._routeIndex < agent._route.length && agent._route[agent._routeIndex] === dest) {
           agent._routeIndex++;
         }
-        return goalId;
+        agent._goal = null; // reached it
+        return dest;
       }
       // Pathfind: pick connection closest to goal
-      const goalLoc = WORLD.locations[goalId];
+      const goalLoc = WORLD.locations[agent._goal];
       if (goalLoc) {
         let bestConn = null, bestDist = Infinity;
         for (const connId of connections) {
@@ -1478,6 +1497,8 @@ function pickDestination(agent, connections) {
         }
         if (bestConn) return bestConn;
       }
+      // Can't pathfind — clear goal
+      agent._goal = null;
     }
   }
 
