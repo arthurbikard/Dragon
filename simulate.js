@@ -1344,19 +1344,21 @@ function simulateMapTurn(agent, stats) {
     }
 
 
-    // Re-enter cleared shop/rest if this was our goal destination
-    if (agent._goal === currentId || agent._goalJustReached === currentId) {
-      agent._goalJustReached = null;
-      if (currentLoc.type === LOC_TYPES.SHOP && campaign.gold >= SHOP_HEAL_PRICE) {
+    // Re-enter cleared shop if agent can do something useful there
+    if (currentLoc.type === LOC_TYPES.SHOP) {
+      const canHealAtShop = gameState.player.hp < gameState.player.maxHp * 0.6 && campaign.gold >= SHOP_HEAL_PRICE;
+      const canRemoveAtShop = campaign.gold >= CARD_REMOVE_PRICE;
+      if (canHealAtShop || canRemoveAtShop) {
         gameState._shopCards = getAvailableShopCards();
         gameState.phase = GAME_PHASES.SHOP;
         return;
       }
-      if (currentLoc.type === LOC_TYPES.REST && canRest()) {
-        _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
-        doRest();
-        return;
-      }
+    }
+    // Re-enter cleared rest if agent can rest and needs HP
+    if (currentLoc.type === LOC_TYPES.REST && canRest() && gameState.player.hp < gameState.player.maxHp * 0.8) {
+      _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
+      doRest();
+      return;
     }
 
     // Location is cleared — navigate to next
