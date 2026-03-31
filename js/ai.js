@@ -108,8 +108,8 @@ const AI_ENEMIES = [
     id: 'corrupted_treant',
     name: 'Corrupted Treant',
     element: ELEMENTS.EARTH,
-    hp: 90,
-    maxHp: 90,
+    hp: 200,
+    maxHp: 200,
     image: 'images/enemy_ember_titan.png',
     // Forest mini-boss — high HP, thorns punish attackers, strength snowballs
     intents: [

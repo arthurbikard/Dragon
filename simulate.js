@@ -887,6 +887,10 @@ function scoreDeck(player) {
  * Simulates a single complete campaign run.
  * Returns detailed stats about the run.
  */
+function _snap() {
+  return { hp: gameState.player.hp, maxHp: gameState.player.maxHp, gold: gameState.campaign.gold, deck: gameState.player.deck.length + gameState.player.discard.length + gameState.player.hand.length, loc: gameState.campaign.currentLocation };
+}
+
 function _hlog(stats, type, data) {
   if (HISTORY_OUTPUT) stats.history.push({ type, ...data });
 }
@@ -944,10 +948,6 @@ function simulateGame(agent, element, ablation) {
     if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; }
     if (ablation && ablation.apply) ablation.apply();
 
-    // Snapshot helper for history log
-    function _snap() {
-      return { hp: gameState.player.hp, maxHp: gameState.player.maxHp, gold: gameState.campaign.gold, deck: gameState.player.deck.length + gameState.player.discard.length + gameState.player.hand.length, loc: gameState.campaign.currentLocation };
-    }
 
     let actions = 0;
 
@@ -1255,15 +1255,18 @@ function simulateMapTurn(agent, stats) {
       }
 
       if (type === LOC_TYPES.REST && _activeAblation !== 'No resting') {
-        if (!canRest()) {
-          // Can't rest yet — just clear and move on
-          clearLocation(currentId);
-          return;
-        }
+        const restable = canRest();
         const hpRatio = gameState.player.hp / gameState.player.maxHp;
         const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
         const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
-        if (hpRatio < 0.5) {
+
+        if (!restable && gameState.campaign.gold < CARD_UPGRADE_PRICE) {
+          // Can't rest and can't afford upgrade/remove — move on
+          clearLocation(currentId);
+          return;
+        }
+
+        if (restable && hpRatio < 0.5) {
           doRest(); // heal when critically low
         } else if (hasFiller) {
           // Remove filler cards first — deck quality > upgrades
@@ -1314,23 +1317,6 @@ function simulateMapTurn(agent, stats) {
       return;
     }
 
-    // Re-enter cleared rest/shop if HP is critical (once per location)
-    const _hpRatio = gameState.player.hp / gameState.player.maxHp;
-    if (!gameState._healRetried) gameState._healRetried = new Set();
-    if (_hpRatio < 0.4 && !gameState._healRetried.has(currentId)) {
-      gameState._healRetried.add(currentId);
-      if (currentLoc.type === LOC_TYPES.REST && canRest() && _activeAblation !== 'No resting') {
-        _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
-        doRest();
-        return;
-      }
-      if (currentLoc.type === LOC_TYPES.SHOP && gameState.campaign.gold >= SHOP_HEAL_PRICE && _activeAblation !== 'No gold (shop disabled)') {
-        gameState._shopCards = getAvailableShopCards();
-        gameState.phase = GAME_PHASES.SHOP;
-        return;
-      }
-    }
-
     // Location is cleared — navigate to next
     const connections = (currentLoc.paths || []).filter(id => canTravelTo(id));
 
@@ -1343,6 +1329,20 @@ function simulateMapTurn(agent, stats) {
     if (!dest) { stats.error = 'No destination from ' + currentId; return; }
 
     travelTo(dest);
+    _hlog(stats, 'move', { ..._snap(), to: dest });
+
+    // Roll for ambush after traveling
+    const ambushEnemy = rollAmbush(dest);
+    if (ambushEnemy) {
+      gameState._battleLocationId = null;
+      gameState._battleGoldReward = 5;
+      gameState._battleIsElite = false;
+      gameState._isAmbush = true;
+      setupAIBattleByEnemy(ambushEnemy);
+      prepareBattle();
+      startTurn('player');
+      stats.battlesFought++;
+    }
   } catch (e) {
     stats.error = e.message + ' (map at ' + gameState.campaign.currentLocation + ')';
   }
@@ -1368,28 +1368,8 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // Survival priority: when HP is low, seek rest sites or shops for healing
-  const hpCritical = hpRatio < 0.4;
-  const hasHealGold = campaign.gold >= SHOP_HEAL_PRICE;
-  if (agent._route && hpCritical) {
-    // Prefer adjacent rest site we can use
-    const restSites = connections.filter(id => {
-      const loc = WORLD.locations[id];
-      return loc && loc.type === LOC_TYPES.REST && canRest();
-    });
-    if (restSites.length > 0) return restSites[0];
-    // Or a shop where we can buy a heal
-    if (hasHealGold) {
-      const shops = connections.filter(id => {
-        const loc = WORLD.locations[id];
-        return loc && loc.type === LOC_TYPES.SHOP;
-      });
-      if (shops.length > 0) return shops[0];
-    }
-  }
-
-  // Shop-seeking: when gold >= 15 and healthy enough, divert to adjacent shop
-  if (agent._route && campaign.gold >= 15 && !hpCritical) {
+  // Shop-seeking: when gold >= 15, divert to adjacent shop
+  if (agent._route && campaign.gold >= 15) {
     const shops = connections.filter(id => {
       const loc = WORLD.locations[id];
       return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
