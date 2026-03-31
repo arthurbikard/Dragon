@@ -279,21 +279,47 @@ const AGENTS = {
     },
     pickMapAction() { return 'scripted'; },
     pickReward(cards) {
-      // Always pick legendary, then rare, then score
+      // Always pick legendary/rare
       const legendaryIdx = cards.findIndex(c => c.rarity === 'legendary');
       if (legendaryIdx >= 0) return legendaryIdx;
       const rareIdx = cards.findIndex(c => c.rarity === 'rare');
       if (rareIdx >= 0) return rareIdx;
+
+      // Skip if deck is already big enough (unless forced pick)
+      const deckSize = gameState.player.deck.length + gameState.player.discard.length + gameState.player.hand.length;
+      if (deckSize >= 12 && gameState._rewardSkippable !== false) return -1;
+
+      // Score cards considering deck balance
+      const deck = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+      const totalDmg = deck.reduce((s, c) => s + (c.damage || 0), 0);
+      const totalBlk = deck.reduce((s, c) => s + (c.block || 0), 0);
+      const hasHeal = deck.some(c => c.effects.some(e => e.type === 'heal'));
+      const hasCleanse = deck.some(c => c.effects.some(e => e.type === 'cleanse'));
+
       let best = 0;
       let bestScore = -1;
       cards.forEach((c, i) => {
-        const score = c.damage * 1.5 + c.block + c.effects.reduce((s, e) => {
-          if (e.type === 'burn') return s + e.value * 2;
-          if (e.type === 'heal') return s + e.value * 1.5;
-          if (e.type === 'draw') return s + e.value * 3;
-          if (e.type === 'gainEnergy') return s + e.value * 4;
-          return s + 2;
-        }, 0);
+        let score = 0;
+        // Base value
+        score += (c.damage || 0) * 1.0;
+        score += (c.block || 0) * 0.8;
+        for (const e of (c.effects || [])) {
+          if (e.type === 'burn') score += e.value * (e.duration || 1) * 1.5;
+          else if (e.type === 'heal') score += e.value * (hasHeal ? 1.0 : 3.0);
+          else if (e.type === 'cleanse') score += hasCleanse ? 2 : 8;
+          else if (e.type === 'draw') score += e.value * 4;
+          else if (e.type === 'gainEnergy') score += e.value * 5;
+          else if (e.type === 'vulnerable') score += (e.duration || 1) * 3;
+          else if (e.type === 'weak') score += (e.duration || 1) * 2.5;
+          else if (e.type === 'thorns') score += e.value * (e.duration || 1) * 1.2;
+          else score += 2;
+        }
+        // Balance bonus: prefer what the deck lacks
+        if (totalDmg > totalBlk * 2 && c.block > 0) score += c.block * 1.5;
+        if (totalBlk > totalDmg * 1.5 && c.damage > 0) score += c.damage * 1.5;
+        // Energy efficiency
+        const cost = c.cost || 1;
+        if (cost > 0 && c.damage > 0) score += (c.damage / cost) * 0.5;
         if (score > bestScore) { bestScore = score; best = i; }
       });
       return best;
@@ -900,10 +926,10 @@ function _shouldEnterShop() {
   // Can remove a card (filler or bloated deck)
   if (gold >= CARD_REMOVE_PRICE) {
     const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
-    if (hasFiller || allCards.length > 12) return true;
+    if (hasFiller || allCards.length > 10) return true;
   }
   // Can buy a card (deck not too big, can afford something)
-  if (allCards.length <= 14) {
+  if (allCards.length <= 10) {
     const items = gameState._shopCards || getAvailableShopCards();
     if (items.some(i => i.price <= gold)) return true;
   }
@@ -1073,7 +1099,7 @@ function simulateGame(agent, element, ablation) {
         const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
         if (gold >= CARD_REMOVE_PRICE) {
           const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
-          const deckBloated = allCards.length > 12;
+          const deckBloated = allCards.length > 10;
           if (hasFiller || deckBloated) {
             _hlog(stats, 'shop', { ..._snap(), action: 'remove' });
             openShopRemove();
@@ -1111,15 +1137,16 @@ function simulateGame(agent, element, ablation) {
         const canAffordRemove = campaign.gold >= CARD_REMOVE_PRICE;
         const canAffordUpgrade = campaign.gold >= CARD_UPGRADE_PRICE;
 
-        if (hpRatio < 0.5) {
+        if (hpRatio < 0.4) {
+          // Critical HP — always heal
           _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
           doRest();
-        } else if (deckSize > 10 && canAffordRemove) {
-          // Deck too big — thin it
+        } else if (deckSize > 8 && canAffordRemove) {
+          // Aggressively thin deck — ideal size is ~8-10
           _hlog(stats, 'rest', { ..._snap(), action: 'remove' });
           gameState._upgradeMode = 'remove';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
-        } else if (hasUpgradeable && canAffordUpgrade && hpRatio > 0.7) {
+        } else if (hasUpgradeable && canAffordUpgrade) {
           _hlog(stats, 'rest', { ..._snap(), action: 'upgrade' });
           gameState._upgradeMode = 'upgrade';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
@@ -1127,7 +1154,6 @@ function simulateGame(agent, element, ablation) {
           _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
           doRest();
         } else {
-          // Full HP, nothing to spend on — just clear and go
           clearLocation(gameState.campaign.currentLocation);
           returnToMap();
         }
@@ -1457,6 +1483,15 @@ function pickDestination(agent, connections) {
     }
 
     // Set a new goal if we don't have one, or override for urgent needs
+    // Override goal for urgent needs (shop when flush or low HP)
+    if (agent._goal && _shouldEnterShop()) {
+      const goalLoc = WORLD.locations[agent._goal];
+      const goalIsShop = goalLoc && goalLoc.type === LOC_TYPES.SHOP;
+      if (!goalIsShop) {
+        // Current goal isn't a shop — override it
+        agent._goal = null;
+      }
+    }
     if (!agent._goal) {
       // Seek shop if agent can do something useful there
       if (_shouldEnterShop()) {
