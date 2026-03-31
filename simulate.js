@@ -921,8 +921,8 @@ function simulateGame(agent, element, ablation) {
     _activeAblation = ablation ? ablation.name : null;
     _simVisited = new Set();
     // Reset scripted routes
-    if (AGENTS.optimal._route) AGENTS.optimal._routeIndex = 0;
-    if (AGENTS.lookahead._route) AGENTS.lookahead._routeIndex = 0;
+    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; AGENTS.optimal._lastShopVisited = null; }
+    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; }
     if (ablation && ablation.apply) ablation.apply();
 
     let actions = 0;
@@ -1311,8 +1311,20 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // Optimal agent: follow scripted route
-  if (agent.name === 'Optimal' && agent._route) {
+  // Shop-seeking: when gold >= 15, divert to nearest shop we haven't just visited
+  if (agent._route && campaign.gold >= 15) {
+    const shops = connections.filter(id => {
+      const loc = WORLD.locations[id];
+      return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
+    });
+    if (shops.length > 0) {
+      agent._lastShopVisited = shops[0];
+      return shops[0];
+    }
+  }
+
+  // Scripted route agents
+  if (agent._route) {
     // Find the next destination in the route that we can travel to
     while (agent._routeIndex < agent._route.length) {
       const target = agent._route[agent._routeIndex];
