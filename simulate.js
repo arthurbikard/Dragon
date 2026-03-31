@@ -891,6 +891,25 @@ function scoreDeck(player) {
  * Simulates a single complete campaign run.
  * Returns detailed stats about the run.
  */
+// Shared check: can the agent do something useful at a shop right now?
+function _shouldEnterShop() {
+  const gold = gameState.campaign.gold;
+  const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+  // Can heal and needs it
+  if (gameState.player.hp < gameState.player.maxHp * 0.6 && gold >= SHOP_HEAL_PRICE) return true;
+  // Can remove a card (filler or bloated deck)
+  if (gold >= CARD_REMOVE_PRICE) {
+    const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
+    if (hasFiller || allCards.length > 12) return true;
+  }
+  // Can buy a card (deck not too big, can afford something)
+  if (allCards.length <= 14) {
+    const items = gameState._shopCards || getAvailableShopCards();
+    if (items.some(i => i.price <= gold)) return true;
+  }
+  return false;
+}
+
 function _snap() {
   return { hp: gameState.player.hp, maxHp: gameState.player.maxHp, gold: gameState.campaign.gold, deck: gameState.player.deck.length + gameState.player.discard.length + gameState.player.hand.length, loc: gameState.campaign.currentLocation };
 }
@@ -1344,15 +1363,11 @@ function simulateMapTurn(agent, stats) {
     }
 
 
-    // Re-enter cleared shop if agent can do something useful there
-    if (currentLoc.type === LOC_TYPES.SHOP) {
-      const canHealAtShop = gameState.player.hp < gameState.player.maxHp * 0.6 && campaign.gold >= SHOP_HEAL_PRICE;
-      const canRemoveAtShop = campaign.gold >= CARD_REMOVE_PRICE;
-      if (canHealAtShop || canRemoveAtShop) {
-        gameState._shopCards = getAvailableShopCards();
-        gameState.phase = GAME_PHASES.SHOP;
-        return;
-      }
+    // Re-enter cleared shop/rest if agent can do something useful
+    if (currentLoc.type === LOC_TYPES.SHOP && _shouldEnterShop()) {
+      gameState._shopCards = getAvailableShopCards();
+      gameState.phase = GAME_PHASES.SHOP;
+      return;
     }
     // Re-enter cleared rest if agent can rest and needs HP
     if (currentLoc.type === LOC_TYPES.REST && canRest() && gameState.player.hp < gameState.player.maxHp * 0.8) {
@@ -1443,15 +1458,8 @@ function pickDestination(agent, connections) {
 
     // Set a new goal if we don't have one, or override for urgent needs
     if (!agent._goal) {
-      // Gold >= 20 → find shop to spend
-      if (campaign.gold >= 20) {
-        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
-          const loc = WORLD.locations[id];
-          return loc && loc.type === LOC_TYPES.SHOP && id !== campaign.currentLocation;
-        });
-      }
-      // Low HP + has gold → shop for heals
-      if (!agent._goal && hpRatio < 0.5 && campaign.gold >= SHOP_HEAL_PRICE) {
+      // Seek shop if agent can do something useful there
+      if (_shouldEnterShop()) {
         agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
           const loc = WORLD.locations[id];
           return loc && loc.type === LOC_TYPES.SHOP && id !== campaign.currentLocation;
