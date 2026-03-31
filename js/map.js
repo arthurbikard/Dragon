@@ -42,7 +42,7 @@ const WORLD = {
     forest: {
       name: 'Thornwood Forest',
       description: 'Twisted trees claw at a bruised sky. Bioluminescent fungi pulse in the undergrowth. The corruption runs deep here.',
-      cardPool: ['rock_throw', 'earthquake', 'stone_wall', 'fortify', 'thorns', 'dragon_claw', 'dragon_scales', 'healing_rain'],
+      cardPool: ['rock_throw', 'earthquake', 'vine_lash', 'spore_burst', 'natures_wrath', 'bark_armor', 'rejuvenate', 'thorns', 'dragon_claw', 'dragon_scales'],
       enemyPool: ['thornback', 'fungal_crawler'],
       elitePool: ['giant_spider'],
       palette: { bg: '#0a1a0a', path: 'rgba(80, 160, 80, 0.3)', accent: '#4a8a4a' },
