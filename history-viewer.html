@@ -44,8 +44,8 @@
 <body>
   <h1>Game History Viewer</h1>
   <div class="controls">
+    <button onclick="fetch('sim-history.json?t='+Date.now()).then(r=>r.json()).then(show).catch(e=>alert('Failed: '+e.message))">Load sim-history.json</button>
     <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
-    <button onclick="fetch('sim-history.json').then(r=>r.json()).then(show).catch(()=>alert('No sim-history.json found'))">Load sim-history.json</button>
   </div>
   <div class="run-list" id="runList"></div>
   <div class="summary" id="summary" style="display:none"></div>

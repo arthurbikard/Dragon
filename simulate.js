@@ -376,13 +376,26 @@ const AGENTS = {
       const enemyAttacking = intent && (intent.type === 'attack' || intent.type === 'heavy_attack');
       const incomingDamage = enemyAttacking ? (intent.damage || 0) : 0;
 
-      // Heuristic pre-score: bias toward defense when enemy attacks, attack otherwise
+      const hpRatio = actor.hp / actor.maxHp;
+
+      // Heuristic pre-score: context-aware card selection
       function heuristicBonus(card) {
         let bonus = 0;
+
+        // Survival priority: heal when HP is low, regardless of enemy intent
+        if (hpRatio < 0.4) {
+          for (const e of card.effects) {
+            if (e.type === 'heal') bonus += e.value * 4;
+          }
+          if (card.block > 0) bonus += card.block * 1.5;
+        }
+
         if (enemyAttacking) {
           // Prefer block/heal when enemy is attacking
           if (card.block > 0) bonus += Math.min(card.block, incomingDamage) * 1.5;
-          if (card.effects.some(e => e.type === 'heal')) bonus += 8;
+          for (const e of card.effects) {
+            if (e.type === 'heal') bonus += e.value * 2;
+          }
         } else {
           // Prefer damage/burn when enemy is buffing/defending
           if (card.damage > 0) bonus += card.damage * 1.2;
@@ -1125,13 +1138,15 @@ function simulateGame(agent, element, ablation) {
           continue;
         }
 
-        // Check gold for upgrade/remove at rest sites
+        // Check gold for upgrade/remove at rest sites — go to map if can't afford
         if (mode === 'upgrade' && !gameState._returnToShop && gameState.campaign.gold < CARD_UPGRADE_PRICE) {
-          returnFromUpgrade();
+          clearLocation(gameState.campaign.currentLocation);
+          returnToMap();
           continue;
         }
         if (mode === 'remove' && !gameState._returnToShop && gameState.campaign.gold < CARD_REMOVE_PRICE) {
-          returnFromUpgrade();
+          clearLocation(gameState.campaign.currentLocation);
+          returnToMap();
           continue;
         }
 
@@ -1299,6 +1314,23 @@ function simulateMapTurn(agent, stats) {
       return;
     }
 
+    // Re-enter cleared rest/shop if HP is critical (once per location)
+    const _hpRatio = gameState.player.hp / gameState.player.maxHp;
+    if (!gameState._healRetried) gameState._healRetried = new Set();
+    if (_hpRatio < 0.4 && !gameState._healRetried.has(currentId)) {
+      gameState._healRetried.add(currentId);
+      if (currentLoc.type === LOC_TYPES.REST && canRest() && _activeAblation !== 'No resting') {
+        _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
+        doRest();
+        return;
+      }
+      if (currentLoc.type === LOC_TYPES.SHOP && gameState.campaign.gold >= SHOP_HEAL_PRICE && _activeAblation !== 'No gold (shop disabled)') {
+        gameState._shopCards = getAvailableShopCards();
+        gameState.phase = GAME_PHASES.SHOP;
+        return;
+      }
+    }
+
     // Location is cleared — navigate to next
     const connections = (currentLoc.paths || []).filter(id => canTravelTo(id));
 
@@ -1336,8 +1368,28 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // Shop-seeking: when gold >= 15, divert to nearest shop we haven't just visited
-  if (agent._route && campaign.gold >= 15) {
+  // Survival priority: when HP is low, seek rest sites or shops for healing
+  const hpCritical = hpRatio < 0.4;
+  const hasHealGold = campaign.gold >= SHOP_HEAL_PRICE;
+  if (agent._route && hpCritical) {
+    // Prefer adjacent rest site we can use
+    const restSites = connections.filter(id => {
+      const loc = WORLD.locations[id];
+      return loc && loc.type === LOC_TYPES.REST && canRest();
+    });
+    if (restSites.length > 0) return restSites[0];
+    // Or a shop where we can buy a heal
+    if (hasHealGold) {
+      const shops = connections.filter(id => {
+        const loc = WORLD.locations[id];
+        return loc && loc.type === LOC_TYPES.SHOP;
+      });
+      if (shops.length > 0) return shops[0];
+    }
+  }
+
+  // Shop-seeking: when gold >= 15 and healthy enough, divert to adjacent shop
+  if (agent._route && campaign.gold >= 15 && !hpCritical) {
     const shops = connections.filter(id => {
       const loc = WORLD.locations[id];
       return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
