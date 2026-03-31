@@ -279,7 +279,11 @@ const AGENTS = {
     },
     pickMapAction() { return 'scripted'; },
     pickReward(cards) {
-      // Pick best card by a composite score
+      // Always pick legendary, then rare, then score
+      const legendaryIdx = cards.findIndex(c => c.rarity === 'legendary');
+      if (legendaryIdx >= 0) return legendaryIdx;
+      const rareIdx = cards.findIndex(c => c.rarity === 'rare');
+      if (rareIdx >= 0) return rareIdx;
       let best = 0;
       let bestScore = -1;
       cards.forEach((c, i) => {
@@ -944,8 +948,8 @@ function simulateGame(agent, element, ablation) {
     _activeAblation = ablation ? ablation.name : null;
     _simVisited = new Set();
     // Reset scripted routes
-    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; AGENTS.optimal._lastShopVisited = null; }
-    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; }
+    if (AGENTS.optimal._route) { AGENTS.optimal._routeIndex = 0; AGENTS.optimal._lastShopVisited = null; AGENTS.optimal._lastHealVisit = null; }
+    if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; AGENTS.lookahead._lastHealVisit = null; }
     if (ablation && ablation.apply) ablation.apply();
 
 
@@ -1368,15 +1372,37 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // Shop-seeking: when gold >= 15, divert to adjacent shop
-  if (agent._route && campaign.gold >= 15) {
-    const shops = connections.filter(id => {
-      const loc = WORLD.locations[id];
-      return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
-    });
-    if (shops.length > 0) {
-      agent._lastShopVisited = shops[0];
-      return shops[0];
+  // Smart diversion: check for adjacent heal/shop opportunities before following route
+  if (agent._route) {
+    const needsHeal = hpRatio < 0.5;
+    const wantsShop = campaign.gold >= 15;
+
+    // When HP is low, divert to adjacent rest (if usable) or shop (if can afford heal)
+    if (needsHeal) {
+      const healable = connections.filter(id => {
+        if (id === agent._lastHealVisit) return false; // don't revisit same heal location
+        const loc = WORLD.locations[id];
+        if (!loc) return false;
+        if (loc.type === LOC_TYPES.REST && canRest()) return true;
+        if (loc.type === LOC_TYPES.SHOP && campaign.gold >= SHOP_HEAL_PRICE && !campaign.cleared.has(id)) return true;
+        return false;
+      });
+      if (healable.length > 0) {
+        agent._lastHealVisit = healable[0];
+        return healable[0];
+      }
+    }
+
+    // When flush with gold, visit adjacent shop (but not the same one twice in a row)
+    if (wantsShop && !needsHeal) {
+      const shops = connections.filter(id => {
+        const loc = WORLD.locations[id];
+        return loc && loc.type === LOC_TYPES.SHOP && id !== agent._lastShopVisited;
+      });
+      if (shops.length > 0) {
+        agent._lastShopVisited = shops[0];
+        return shops[0];
+      }
     }
   }
 
