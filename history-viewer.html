@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dragon Cards — Game History Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; color: #e0d5c0; font-family: 'Cormorant Garamond', serif; padding: 20px; }
+    h1 { font-family: 'Cinzel', serif; color: #c8a96e; font-size: 24px; margin-bottom: 12px; }
+    .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    button { font-family: 'Cinzel', serif; background: linear-gradient(135deg, #c8a96e, #a07830); color: #1a1a2e; padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    button:hover { background: linear-gradient(135deg, #ddbf80, #b89050); }
+    select, input[type=file] { background: #1a1a2e; color: #e0d5c0; border: 1px solid #333; padding: 6px; border-radius: 4px; font-family: inherit; }
+    .run-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .run-btn { font-size: 12px; padding: 4px 10px; background: #1a1a2e; border: 1px solid #333; color: #aaa; border-radius: 4px; cursor: pointer; }
+    .run-btn:hover { border-color: #c8a96e; color: #c8a96e; }
+    .run-btn.active { border-color: #c8a96e; color: #c8a96e; background: rgba(200,169,110,0.1); }
+    .run-btn.victory { border-color: #4a4; color: #4a4; }
+    .run-btn.death { border-color: #a44; color: #a44; }
+    .run-btn.error { border-color: #a84; color: #a84; }
+    .timeline { max-width: 900px; }
+    .event { display: flex; gap: 12px; padding: 8px 12px; border-left: 3px solid #333; margin-left: 8px; position: relative; }
+    .event:hover { background: rgba(200,169,110,0.05); }
+    .event-icon { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+    .event-body { flex: 1; }
+    .event-title { font-weight: 600; font-size: 15px; color: #c8a96e; }
+    .event-detail { font-size: 13px; color: #999; margin-top: 2px; }
+    .event-stats { display: flex; gap: 12px; font-size: 12px; color: #777; margin-top: 3px; }
+    .stat-hp { color: #e05555; }
+    .stat-gold { color: #c8a96e; }
+    .stat-deck { color: #88aacc; }
+    .event.battle { border-color: #a44; }
+    .event.battle.won { border-color: #4a4; }
+    .event.reward { border-color: #88c; }
+    .event.shop { border-color: #c8a96e; }
+    .event.rest { border-color: #e05555; }
+    .event.death { border-color: #f00; background: rgba(255,0,0,0.05); }
+    .event.victory { border-color: #0f0; background: rgba(0,255,0,0.05); }
+    .hp-bar { display: inline-block; height: 8px; border-radius: 4px; margin-left: 4px; vertical-align: middle; }
+    .summary { font-size: 14px; color: #888; margin-bottom: 12px; padding: 8px 12px; background: rgba(200,169,110,0.06); border-radius: 6px; border: 1px solid rgba(200,169,110,0.1); }
+  </style>
+</head>
+<body>
+  <h1>Game History Viewer</h1>
+  <div class="controls">
+    <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
+    <button onclick="fetch('sim-history.json').then(r=>r.json()).then(show).catch(()=>alert('No sim-history.json found'))">Load sim-history.json</button>
+  </div>
+  <div class="run-list" id="runList"></div>
+  <div class="summary" id="summary" style="display:none"></div>
+  <div class="timeline" id="timeline"></div>
+
+<script>
+let allRuns = [];
+
+function loadFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => show(JSON.parse(ev.target.result));
+  reader.readAsText(file);
+}
+
+function show(runs) {
+  allRuns = runs;
+  const list = document.getElementById('runList');
+  list.innerHTML = runs.map((r, i) => {
+    const cls = r.outcome === 'victory' ? 'victory' : r.outcome === 'error' ? 'error' : 'death';
+    const label = `#${i+1} ${r.agent} ${r.element} ${r.outcome === 'victory' ? '★' : r.outcome === 'error' ? '?' : '✗'}`;
+    return `<button class="run-btn ${cls}" onclick="showRun(${i})">${label}</button>`;
+  }).join('');
+
+  // Summary
+  const agents = {};
+  for (const r of runs) {
+    if (!agents[r.agent]) agents[r.agent] = { total: 0, wins: 0 };
+    agents[r.agent].total++;
+    if (r.outcome === 'victory') agents[r.agent].wins++;
+  }
+  const sumEl = document.getElementById('summary');
+  sumEl.style.display = '';
+  sumEl.innerHTML = Object.entries(agents).map(([name, s]) =>
+    `<b>${name}</b>: ${s.wins}/${s.total} wins (${(s.wins/s.total*100).toFixed(1)}%)`
+  ).join(' &nbsp;|&nbsp; ');
+
+  if (runs.length > 0) showRun(0);
+}
+
+function showRun(index) {
+  // Highlight active
+  document.querySelectorAll('.run-btn').forEach((b, i) => b.classList.toggle('active', i === index));
+
+  const run = allRuns[index];
+  const tl = document.getElementById('timeline');
+
+  const icons = { battle: '⚔', reward: '🎴', shop: '🛒', rest: '🔥', death: '💀', victory: '🏆', event: '❓', npc: '💬' };
+
+  tl.innerHTML = run.history.map(ev => {
+    const ic = icons[ev.type] || '•';
+    let cls = ev.type;
+    let title = '';
+    let detail = '';
+
+    const hpBar = ev.hp != null && ev.maxHp ? `<span class="hp-bar" style="width:${Math.max(2, ev.hp/ev.maxHp*60)}px; background:${ev.hp/ev.maxHp > 0.5 ? '#4a4' : ev.hp/ev.maxHp > 0.25 ? '#aa4' : '#a44'}"></span>` : '';
+    const statsLine = ev.hp != null ? `<div class="event-stats"><span class="stat-hp">♥ ${ev.hp}/${ev.maxHp} ${hpBar}</span><span class="stat-gold">● ${ev.gold}g</span><span class="stat-deck">◆ ${ev.deck} cards</span></div>` : '';
+
+    switch (ev.type) {
+      case 'battle':
+        cls += ev.won ? ' won' : '';
+        title = `${ev.won ? 'Won' : 'Lost'} vs ${ev.enemy} (${ev.enemyHp} HP)`;
+        detail = `Lost ${ev.hpLost} HP` + (ev.won ? '' : ' — defeated');
+        break;
+      case 'reward':
+        title = `Picked: ${ev.card}`;
+        detail = `Options: ${ev.options.join(', ')}`;
+        break;
+      case 'shop':
+        title = `Shop: ${ev.action}` + (ev.card ? ` — ${ev.card}` : '');
+        break;
+      case 'rest':
+        title = `Rest: ${ev.action}`;
+        break;
+      case 'death':
+        title = `Died at ${ev.location}`;
+        break;
+      case 'victory':
+        title = `Victory! (${ev.hp} HP remaining)`;
+        break;
+      default:
+        title = ev.type;
+    }
+
+    return `<div class="event ${cls}">
+      <div class="event-icon">${ic}</div>
+      <div class="event-body">
+        <div class="event-title">${title}</div>
+        ${detail ? `<div class="event-detail">${detail}</div>` : ''}
+        ${statsLine}
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

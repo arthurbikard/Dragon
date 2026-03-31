@@ -71,6 +71,7 @@ const VERBOSE = !!args.verbose;
 const JSON_OUTPUT = !!args.json;
 const ABLATION_MODE = args.ablation || null;
 const TRACE_OUTPUT = args.trace ? (args.trace === true ? 'sim-traces.json' : args.trace) : null;
+const HISTORY_OUTPUT = args.history ? (args.history === true ? 'sim-history.json' : args.history) : null;
 const SAVE_STATES = args['save-states'] ? (args['save-states'] === true ? 'saved-states.json' : args['save-states']) : null;
 const LOAD_STATE = args['load-state'] || null;
 const _savedStates = [];
@@ -873,6 +874,10 @@ function scoreDeck(player) {
  * Simulates a single complete campaign run.
  * Returns detailed stats about the run.
  */
+function _hlog(stats, type, data) {
+  if (HISTORY_OUTPUT) stats.history.push({ type, ...data });
+}
+
 function simulateGame(agent, element, ablation) {
   const stats = {
     agent: agent.name,
@@ -893,6 +898,7 @@ function simulateGame(agent, element, ablation) {
     error: null,
     totalActions: 0,
     trace: [],
+    history: [], // detailed event log
   };
 
   const MAX_ACTIONS = 5000; // safety limit
@@ -925,6 +931,11 @@ function simulateGame(agent, element, ablation) {
     if (AGENTS.lookahead._route) { AGENTS.lookahead._routeIndex = 0; AGENTS.lookahead._lastShopVisited = null; }
     if (ablation && ablation.apply) ablation.apply();
 
+    // Snapshot helper for history log
+    function _snap() {
+      return { hp: gameState.player.hp, maxHp: gameState.player.maxHp, gold: gameState.campaign.gold, deck: gameState.player.deck.length + gameState.player.discard.length + gameState.player.hand.length, loc: gameState.campaign.currentLocation };
+    }
+
     let actions = 0;
 
     while (actions < MAX_ACTIONS) {
@@ -934,13 +945,14 @@ function simulateGame(agent, element, ablation) {
       if (gameState.phase === GAME_PHASES.VICTORY) {
         stats.won = true;
         stats.finalHp = gameState.player.hp;
+        _hlog(stats, 'victory', { hp: gameState.player.hp });
         break;
       }
-
 
       if (gameState.phase === GAME_PHASES.GAME_OVER) {
         stats.diedAt = gameState._battleLocationId || 'unknown';
         stats.finalHp = 0;
+        _hlog(stats, 'death', { location: stats.diedAt, hp: 0 });
         break;
       }
 
@@ -970,7 +982,12 @@ function simulateGame(agent, element, ablation) {
           gameState.enemy.maxHp *= 2;
           gameState.enemy._doubled = true;
         }
+        const _preHp = gameState.player.hp;
+        const _enemyName = gameState.enemy ? gameState.enemy.name : '?';
+        const _enemyHp = gameState.enemy ? gameState.enemy.maxHp : 0;
         simulateBattleTurn(agent, stats);
+        const won = gameState.enemy && gameState.enemy.hp <= 0;
+        _hlog(stats, 'battle', { ..._snap(), enemy: _enemyName, enemyHp: _enemyHp, hpLost: _preHp - gameState.player.hp, won });
         // Record trace point after battle
         stats.trace.push({
           hp: gameState.player.hp,
@@ -992,8 +1009,11 @@ function simulateGame(agent, element, ablation) {
         if (cards.length > 0) {
           const pick = agent.pickReward(cards);
           if (pick >= 0 && pick < cards.length) {
+            const picked = cards[pick];
+            _hlog(stats, 'reward', { ..._snap(), card: picked.name, options: cards.map(c => c.name) });
             pickRewardCard(pick);
           } else {
+            _hlog(stats, 'reward', { ..._snap(), card: 'SKIP', options: cards.map(c => c.name) });
             skipReward();
           }
         } else {
@@ -1008,6 +1028,7 @@ function simulateGame(agent, element, ablation) {
 
         // Buy heal potion if low HP
         if (gameState.player.hp < gameState.player.maxHp * 0.6 && gold >= SHOP_HEAL_PRICE) {
+          _hlog(stats, 'shop', { ..._snap(), action: 'heal' });
           buyHeal();
           continue;
         }
@@ -1016,6 +1037,7 @@ function simulateGame(agent, element, ablation) {
         const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
         const hasFiller = allCards.some(c => c.templateKey === 'stumble' || c.templateKey === 'brace');
         if (hasFiller && gold >= CARD_REMOVE_PRICE) {
+          _hlog(stats, 'shop', { ..._snap(), action: 'remove' });
           openShopRemove();
           continue;
         }
@@ -1025,13 +1047,14 @@ function simulateGame(agent, element, ablation) {
         const pick = agent.pickShopCard(items, gold);
         if (pick >= 0) {
           const before = gameState.campaign.gold;
+          _hlog(stats, 'shop', { ..._snap(), action: 'buy', card: items[pick].card.name });
           buyCard(pick);
           stats.goldSpent += before - gameState.campaign.gold;
-          // Stay in shop to buy more if possible
           continue;
         }
 
-        // Done shopping — leave (clears the location)
+        // Done shopping — leave
+        _hlog(stats, 'shop', { ..._snap(), action: 'leave' });
         leaveShop();
         continue;
       }
@@ -1047,16 +1070,18 @@ function simulateGame(agent, element, ablation) {
         const deckSize = gameState.player.deck.length + gameState.player.discard.length;
 
         if (hpRatio < 0.5) {
-          doRest(); // heal when low
+          _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
+          doRest();
         } else if (deckSize > 10 && hpRatio > 0.5) {
-          // Remove weakest card if deck has filler
+          _hlog(stats, 'rest', { ..._snap(), action: 'remove' });
           gameState._upgradeMode = 'remove';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
         } else if (hasUpgradeable && hpRatio > 0.7) {
-          // Upgrade best card when healthy
+          _hlog(stats, 'rest', { ..._snap(), action: 'upgrade' });
           gameState._upgradeMode = 'upgrade';
           gameState.phase = GAME_PHASES.CARD_UPGRADE;
         } else {
+          _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
           doRest();
         }
         continue;
@@ -1592,6 +1617,25 @@ function runSimulations() {
       };
     }
     console.log(JSON.stringify(jsonOutput, null, 2));
+  }
+
+  // Save game histories for inspection
+  if (HISTORY_OUTPUT) {
+    const histories = [];
+    for (const agentName of agentNames) {
+      for (const r of allResults[agentName]) {
+        if (r.history && r.history.length > 0) {
+          histories.push({
+            agent: agentName, element: r.element,
+            outcome: r.won ? 'victory' : (r.error ? 'error' : 'death'),
+            diedAt: r.diedAt, finalHp: r.finalHp,
+            history: r.history,
+          });
+        }
+      }
+    }
+    fs.writeFileSync(HISTORY_OUTPUT, JSON.stringify(histories, null, 2));
+    console.log(`History saved to ${HISTORY_OUTPUT} (${histories.length} runs)`);
   }
 
   // Save game states after first mini-boss
