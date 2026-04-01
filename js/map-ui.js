@@ -804,6 +804,14 @@ function doCardAction(index) {
     return;
   }
 
+  // Return to shop if we came from there, otherwise go to map
+  if (gameState._returnToShop) {
+    gameState._returnToShop = false;
+    gameState.phase = GAME_PHASES.SHOP;
+    renderGame();
+    return;
+  }
+
   clearLocation(gameState.campaign.currentLocation);
   returnToMap();
 }
