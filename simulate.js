@@ -1389,19 +1389,6 @@ function simulateMapTurn(agent, stats) {
     }
 
 
-    // Re-enter cleared shop/rest if agent can do something useful
-    if (currentLoc.type === LOC_TYPES.SHOP && _shouldEnterShop()) {
-      gameState._shopCards = getAvailableShopCards();
-      gameState.phase = GAME_PHASES.SHOP;
-      return;
-    }
-    // Re-enter cleared rest if agent can rest and needs HP
-    if (currentLoc.type === LOC_TYPES.REST && canRest() && gameState.player.hp < gameState.player.maxHp * 0.8) {
-      _hlog(stats, 'rest', { ..._snap(), action: 'heal' });
-      doRest();
-      return;
-    }
-
     // Location is cleared — navigate to next
     const connections = (currentLoc.paths || []).filter(id => canTravelTo(id));
 
@@ -1458,6 +1445,9 @@ function pickDestination(agent, connections) {
 
   const campaign = gameState.campaign;
   const hpRatio = gameState.player.hp / gameState.player.maxHp;
+  const gold = campaign.gold;
+  const allCards = [...gameState.player.deck, ...gameState.player.discard, ...gameState.player.hand];
+  const deckSize = allCards.length;
 
   if (agent.name === 'Random') {
     return connections[Math.floor(Math.random() * connections.length)];
@@ -1472,112 +1462,80 @@ function pickDestination(agent, connections) {
     return connections[Math.floor(Math.random() * connections.length)];
   }
 
-  // === Goal-based navigation for scripted route agents ===
-  if (agent._route) {
-    // Check if current committed goal is still valid
-    if (agent._goal) {
-      if (agent._goal === campaign.currentLocation) {
-        agent._goalJustReached = agent._goal;
-        agent._goal = null;
-      }
-    }
+  // === Scored navigation: evaluate each neighbor ===
+  const routeTarget = agent._route && agent._routeIndex < agent._route.length
+    ? agent._route[agent._routeIndex] : null;
 
-    // Set a new goal if we don't have one, or override for urgent needs
-    // Override goal for urgent needs (shop when flush or low HP)
-    if (agent._goal && _shouldEnterShop()) {
-      const goalLoc = WORLD.locations[agent._goal];
-      const goalIsShop = goalLoc && goalLoc.type === LOC_TYPES.SHOP;
-      if (!goalIsShop) {
-        // Current goal isn't a shop — override it
-        agent._goal = null;
-      }
-    }
-    if (!agent._goal) {
-      // Seek shop if agent can do something useful there
-      if (_shouldEnterShop()) {
-        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
-          const loc = WORLD.locations[id];
-          return loc && loc.type === LOC_TYPES.SHOP && id !== campaign.currentLocation;
-        });
-      }
-      // Low HP → rest
-      if (!agent._goal && hpRatio < 0.5 && canRest()) {
-        agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => {
-          const loc = WORLD.locations[id];
-          return loc && loc.type === LOC_TYPES.REST && id !== campaign.currentLocation;
-        });
-      }
-    }
-
-    // Default goal: follow scripted route
-    if (!agent._goal && agent._routeIndex < agent._route.length) {
-      agent._goal = agent._route[agent._routeIndex];
-    }
-
-    // Fallback: explore unvisited
-    if (!agent._goal) {
-      agent._goal = _findNearest(campaign.currentLocation, campaign.explored, id => !campaign.visited.has(id));
-    }
-
-    // Navigate toward goal
-    if (agent._goal) {
-      if (connections.includes(agent._goal)) {
-        const dest = agent._goal;
-        // Advance route if this was the route target
-        if (agent._routeIndex < agent._route.length && agent._route[agent._routeIndex] === dest) {
-          agent._routeIndex++;
-        }
-        agent._goal = null; // reached it
-        return dest;
-      }
-      // Pathfind: pick connection closest to goal
-      const goalLoc = WORLD.locations[agent._goal];
-      if (goalLoc) {
-        let bestConn = null, bestDist = Infinity;
-        for (const connId of connections) {
-          const connLoc = WORLD.locations[connId];
-          if (!connLoc) continue;
-          const dx = connLoc.x - goalLoc.x, dy = connLoc.y - goalLoc.y;
-          if (dx * dx + dy * dy < bestDist) { bestDist = dx * dx + dy * dy; bestConn = connId; }
-        }
-        if (bestConn) return bestConn;
-      }
-      // Can't pathfind — clear goal
-      agent._goal = null;
-    }
-  }
-
-  // Fallback: score-based navigation
   const scored = connections.map(id => {
     const loc = WORLD.locations[id];
     if (!loc) return { id, score: -100 };
     let score = 0;
     const cleared = campaign.cleared.has(id);
 
-    if (!cleared) score += 20;
-    else score -= 10;
+    // --- Exploration pull ---
+    if (!cleared) score += 15;
+    if (!campaign.visited.has(id)) score += 10;
+    if (cleared) score -= 5;
 
-    if (loc.type === LOC_TYPES.REST && hpRatio < 0.6 && canRest()) score += 15;
-    if (loc.type === LOC_TYPES.REST && !canRest()) score -= 5;
-    if (loc.type === LOC_TYPES.SHOP && campaign.gold >= 8) score += 10;
-    if (loc.type === LOC_TYPES.ELITE && !cleared && hpRatio > 0.5) score += 25;
-    if (loc.type === LOC_TYPES.ELITE && hpRatio < 0.4) score -= 10;
-    if (loc.type === LOC_TYPES.MINI_BOSS || loc.type === LOC_TYPES.BOSS) {
-      const eliteCleared = Object.entries(WORLD.locations).some(([eid, l]) => l.type === LOC_TYPES.ELITE && campaign.cleared.has(eid));
-      if (eliteCleared && hpRatio > 0.5) score += 15;
-      else if (!eliteCleared) score -= 20;
-      else score -= 5;
+    // --- Route pull: bonus for being on or closer to route target ---
+    if (routeTarget) {
+      if (id === routeTarget) score += 20;
+      else {
+        const targetLoc = WORLD.locations[routeTarget];
+        if (targetLoc) {
+          const curLoc = WORLD.locations[campaign.currentLocation];
+          const dxCur = curLoc.x - targetLoc.x, dyCur = curLoc.y - targetLoc.y;
+          const dxNext = loc.x - targetLoc.x, dyNext = loc.y - targetLoc.y;
+          const distCur = dxCur * dxCur + dyCur * dyCur;
+          const distNext = dxNext * dxNext + dyNext * dyNext;
+          if (distNext < distCur) score += 8; // getting closer to route target
+        }
+      }
     }
-    if (loc.type === LOC_TYPES.EVENT && !cleared) score += 8;
-    if (id === 'elder_tree' && !cleared) score += 20;
-    if (_simVisited.has(id)) score -= 15;
+
+    // --- HP pressure: seek healing ---
+    if (loc.type === LOC_TYPES.REST && canRest()) {
+      score += (1 - hpRatio) * 30;
+    }
+    if (loc.type === LOC_TYPES.SHOP && gold >= SHOP_HEAL_PRICE && hpRatio < 0.6) {
+      score += (1 - hpRatio) * 25;
+    }
+
+    // --- Gold pressure: spend it ---
+    if (loc.type === LOC_TYPES.SHOP && gold >= CARD_REMOVE_PRICE) {
+      score += Math.min(gold / 10, 3) * 3; // up to +9
+      if (deckSize > 12) score += (deckSize - 12) * 2;
+    }
+
+    // --- Danger awareness ---
+    if ([LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type) && !cleared) {
+      if (hpRatio > 0.7) score += 12;
+      else if (hpRatio > 0.5) score += 0;
+      else score -= 15;
+    }
+    if (loc.type === LOC_TYPES.ELITE && !cleared) {
+      if (hpRatio > 0.6) score += 15;
+      else score -= 10;
+    }
+
+    // --- Anti-oscillation: penalize recently visited ---
+    if (_simVisited.has(id)) score -= 12;
+
+    // --- Random noise ---
+    score += Math.random() * 8;
 
     return { id, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  _simVisited.add(scored[0].id);
-  return scored[0].id;
+  const dest = scored[0].id;
+
+  // Advance route if we're heading to the route target
+  if (routeTarget && dest === routeTarget) {
+    agent._routeIndex++;
+  }
+  _simVisited.add(dest);
+  return dest;
 }
 
 /**
