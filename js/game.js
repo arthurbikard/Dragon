@@ -104,6 +104,13 @@ function prepareBattle() {
   gameState.player.hand = [];
   gameState.player.block = 0;
   gameState.player.statuses = [];
+
+  // Reset Root of Power usage for new battle
+  gameState.player.deck.forEach(card => {
+    if (card.templateKey === 'root_of_power') {
+      card.usedThisBattle = false;
+    }
+  });
   startTurn('player');
 }
 
@@ -234,6 +241,12 @@ function playCard(index) {
   const card = actor.hand[index];
   if (!card || card.cost > actor.energy) return;
 
+  // Special check for Root of Power - can only be used once per battle
+  if (card.templateKey === 'root_of_power' && card.usedThisBattle) {
+    addLog(`${card.name} can only be used once per battle.`);
+    return;
+  }
+
   actor.energy -= card.cost;
 
   const attacker = actor;
@@ -286,6 +299,11 @@ function playCard(index) {
     } else {
       applyEffect(effect, attacker, defender);
     }
+  }
+
+  // Mark Root of Power as used this battle
+  if (card.templateKey === 'root_of_power') {
+    card.usedThisBattle = true;
   }
 
   // Remove card from hand, add to discard
@@ -577,6 +595,25 @@ function handleDeath() {
         addLog(`Earned ${goldReward} gold.`);
         if (typeof showNotification === 'function') showNotification(`+${goldReward} gold`, 'gold');
       }
+
+      // Root of Power grows stronger after each victory
+      const allCards = [
+        ...gameState.player.deck,
+        ...gameState.player.hand,
+        ...gameState.player.discard
+      ];
+      allCards.forEach(card => {
+        if (card.templateKey === 'root_of_power') {
+          // Increase strength value by 1 (from 2 to 3, 4, etc.)
+          if (card.effects && card.effects[0] && card.effects[0].type === 'strength') {
+            card.effects[0].value += 1;
+            // Update description to reflect new power level
+            card.description = `Gain ${card.effects[0].value} Strength for 4 turns. Ancient power flows through your veins.`;
+            addLog(`Root of Power grows stronger! Now grants ${card.effects[0].value} Strength.`);
+            if (typeof showNotification === 'function') showNotification(`Root of Power +1 Strength!`, 'upgrade');
+          }
+        }
+      });
 
       // Mini-boss: grant blessing
       if (gameState._miniBossBlessing) {

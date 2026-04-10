@@ -455,6 +455,13 @@ const RARE_CARD_TEMPLATES = {
     description: 'Gain 8 Block. Heal 6 HP. Draw 1 card. The village elder\'s blessing guides you.',
     image: 'images/card_elder_spirit.png', rarity: 'legendary',
   },
+  root_of_power: {
+    name: 'Root of Power', type: CARD_TYPES.SKILL, element: ELEMENTS.EARTH,
+    cost: 1, damage: 0, block: 0,
+    effects: [{ type: 'strength', value: 2, duration: 4 }],
+    description: 'Gain 2 Strength for 4 turns. Ancient power flows through your veins.',
+    image: 'images/manual_generations/Gemini_Generated_Image_s73mmos73mmos73m.png', rarity: 'rare',
+  },
 };
 
 // === ITEMS (for compatibility) ===
@@ -641,12 +648,19 @@ function getRareCard() {
 function getRareCardByKey(key) {
   const template = RARE_CARD_TEMPLATES[key];
   if (!template) return null;
-  return {
+  const card = {
     ...template,
     templateKey: key,
     id: _cardId++,
     effects: template.effects.map(e => ({ ...e })),
   };
+
+  // Initialize Root of Power special state
+  if (key === 'root_of_power') {
+    card.usedThisBattle = false;
+  }
+
+  return card;
 }
 
 // Kept for simulator compatibility

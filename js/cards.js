@@ -396,13 +396,20 @@ let _cardId = 0;
 function createCard(templateKey) {
   const template = CARD_TEMPLATES[templateKey];
   if (!template) throw new Error(`Unknown card template: ${templateKey}`);
-  return {
+  const card = {
     ...template,
     templateKey,
     id: _cardId++,
     upgraded: false,
     effects: template.effects.map(e => ({ ...e })),
   };
+
+  // Initialize Root of Power special state
+  if (templateKey === 'root_of_power') {
+    card.usedThisBattle = false;
+  }
+
+  return card;
 }
 
 // Upgrade a card in-place: +3 damage or +3 block or -1 cost (min 0)

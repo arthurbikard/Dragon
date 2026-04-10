@@ -1017,7 +1017,7 @@ function doEventChoice(index) {
 // === TREE OFFERING ===
 
 function showTreeOfferingScreen(offeredCard) {
-  const rareCard = getRareCard();
+  const rareCard = getRareCardByKey('root_of_power');
   gameState.player.deck.push(rareCard);
   gameState._treeRewardCard = rareCard;
   gameState._treeOfferedCard = offeredCard;
