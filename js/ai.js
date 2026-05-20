@@ -120,6 +120,23 @@ const AI_ENEMIES = [
     ],
   },
 
+  // === MOUNTAIN MINI-BOSS ===
+  {
+    id: 'sky_archon',
+    name: 'Sky-Archon',
+    element: ELEMENTS.AIR,
+    hp: 220,
+    maxHp: 220,
+    image: 'images/enemy_storm_wyrm.png',
+    // Mountain mini-boss — high HP, buffs strength and applies weak, heavy lightning strikes.
+    intents: [
+      { type: INTENT_TYPES.ATTACK, damage: 12, effects: [{ type: 'weak', value: 1, duration: 2 }], weight: 3 },
+      { type: INTENT_TYPES.HEAVY_ATTACK, damage: 26, weight: 1 },
+      { type: INTENT_TYPES.BUFF, effects: [{ type: 'strength', value: 2, duration: 4 }], weight: 2 },
+      { type: INTENT_TYPES.DEFEND, block: 18, weight: 1 },
+    ],
+  },
+
   // === ELITE TIER ===
   {
     id: 'iron_golem',

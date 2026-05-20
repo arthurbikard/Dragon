@@ -1474,10 +1474,10 @@ html, body {
 /* Canvas: sized to match the coast map panoramic aspect ratio */
 .world-canvas {
   position: relative;
-  width: 2080px;
+  width: 3600px;
   height: 480px;
   padding: 20px;
-  background-image: url('images/coast_map_bg_wide.png');
+  background-image: url('images/world_map_bg.png');
   background-size: cover;
   background-position: center;
 }

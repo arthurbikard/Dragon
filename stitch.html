@@ -23,8 +23,12 @@
 
 <div class="controls">
   <div>
+    <label>Crop LEFT image right: <input type="number" id="cropLeftImgRight" value="0"></label>
+    <input type="range" id="cropLeftImgRightSlider" min="0" max="5000" value="0">
+  </div>
+  <div>
     <label>Right image X offset: <input type="number" id="offsetX" value="0"></label>
-    <input type="range" id="offsetXSlider" min="-500" max="3500" value="0">
+    <input type="range" id="offsetXSlider" min="-500" max="9000" value="0">
   </div>
   <div>
     <label>Right image Y offset: <input type="number" id="offsetY" value="0"></label>
@@ -32,19 +36,19 @@
   </div>
   <div>
     <label>Crop right image left: <input type="number" id="cropLeft" value="0"></label>
-    <input type="range" id="cropLeftSlider" min="0" max="3000" value="0">
+    <input type="range" id="cropLeftSlider" min="0" max="3500" value="0">
   </div>
   <div>
     <label>Crop right image right: <input type="number" id="cropRight" value="0"></label>
-    <input type="range" id="cropRightSlider" min="0" max="3000" value="0">
+    <input type="range" id="cropRightSlider" min="0" max="3500" value="0">
   </div>
   <div>
     <label>Crop right image top: <input type="number" id="cropTop" value="0"></label>
-    <input type="range" id="cropTopSlider" min="0" max="1000" value="0">
+    <input type="range" id="cropTopSlider" min="0" max="1200" value="0">
   </div>
   <div>
     <label>Crop right image bottom: <input type="number" id="cropBottom" value="0"></label>
-    <input type="range" id="cropBottomSlider" min="0" max="1000" value="0">
+    <input type="range" id="cropBottomSlider" min="0" max="1200" value="0">
   </div>
   <div>
     <label>Zoom: <input type="number" id="zoom" value="25" min="5" max="100" step="5">%</label>
@@ -52,6 +56,10 @@
   </div>
   <div>
     <label><input type="checkbox" id="showGuide" checked> Show seam guide</label>
+  </div>
+  <div>
+    <button onclick="exportImage()">Export stitched</button>
+    <button onclick="exportRight()">Export right tile only</button>
   </div>
   <div id="copyValues" style="background:#333; padding:8px; border-radius:4px; font-family:monospace; font-size:14px; user-select:all; cursor:text;"></div>
 </div>
@@ -70,10 +78,10 @@ const imgRight = new Image();
 let loaded = 0;
 
 imgLeft.onload = imgRight.onload = () => { if (++loaded === 2) { initSliders(); draw(); } };
-imgLeft.src = 'images/coast_map_bg_cropped.png';
-imgRight.src = 'images/Gemini_Generated_Image_bvdm46bvdm46bvdm.png';
+imgLeft.src = 'images/world_map_bg.png';
+imgRight.src = 'images/mountain_map_bg_raw.png';
 
-const fields = ['offsetX', 'offsetY', 'cropLeft', 'cropRight', 'cropTop', 'cropBottom', 'zoom'];
+const fields = ['cropLeftImgRight', 'offsetX', 'offsetY', 'cropLeft', 'cropRight', 'cropTop', 'cropBottom', 'zoom'];
 
 function initSliders() {
   // Set sensible defaults: place right image at left image's right edge
@@ -101,6 +109,9 @@ function draw() {
   const v = getVals();
   const zoom = v.zoom / 100;
 
+  // Effective width of left image after right-side crop
+  const leftEffW = Math.max(1, imgLeft.width - v.cropLeftImgRight);
+
   // Crop region of right image
   const srcX = v.cropLeft;
   const srcY = v.cropTop;
@@ -113,7 +124,7 @@ function draw() {
   const rightX = v.offsetX;
   const rightY = v.offsetY;
 
-  const totalW = Math.max(imgLeft.width, rightX + srcW);
+  const totalW = Math.max(leftEffW, rightX + srcW);
   const totalH = Math.max(imgLeft.height, rightY + srcH, imgLeft.height);
 
   canvas.width = totalW * zoom;
@@ -122,8 +133,9 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = true;
 
-  // Draw left image
-  ctx.drawImage(imgLeft, 0, 0, imgLeft.width * zoom, imgLeft.height * zoom);
+  // Draw left image (cropped on the right)
+  ctx.drawImage(imgLeft, 0, 0, leftEffW, imgLeft.height,
+    0, 0, leftEffW * zoom, imgLeft.height * zoom);
 
   // Draw cropped right image at offset
   ctx.drawImage(imgRight, srcX, srcY, srcW, srcH,
@@ -134,7 +146,7 @@ function draw() {
     ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
     ctx.lineWidth = 2;
     ctx.setLineDash([8, 4]);
-    const guideX = imgLeft.width * zoom;
+    const guideX = leftEffW * zoom;
     ctx.beginPath();
     ctx.moveTo(guideX, 0);
     ctx.lineTo(guideX, canvas.height);
@@ -150,14 +162,15 @@ function draw() {
   }
 
   document.getElementById('info').textContent =
-    `Left: ${imgLeft.width}×${imgLeft.height} | Right (cropped): ${srcW}×${srcH} | Total: ${totalW}×${totalH} | Overlap: ${Math.max(0, imgLeft.width - rightX)}px`;
+    `Left: ${imgLeft.width}×${imgLeft.height} (cropped to ${leftEffW}) | Right (cropped): ${srcW}×${srcH} | Total: ${totalW}×${totalH} | Overlap: ${Math.max(0, leftEffW - rightX)}px`;
 
   document.getElementById('copyValues').textContent =
-    `offsetX=${v.offsetX} offsetY=${v.offsetY} cropLeft=${v.cropLeft} cropRight=${v.cropRight} cropTop=${v.cropTop} cropBottom=${v.cropBottom}`;
+    `cropLeftImgRight=${v.cropLeftImgRight} offsetX=${v.offsetX} offsetY=${v.offsetY} cropLeft=${v.cropLeft} cropRight=${v.cropRight} cropTop=${v.cropTop} cropBottom=${v.cropBottom}`;
 }
 
 function exportRight() {
   const v = getVals();
+  const leftEffW = Math.max(1, imgLeft.width - v.cropLeftImgRight);
   const srcX = v.cropLeft;
   const srcY = v.cropTop;
   const srcW = imgRight.width - v.cropLeft - v.cropRight;
@@ -165,9 +178,9 @@ function exportRight() {
   if (srcW <= 0 || srcH <= 0) return;
 
   // The right tile should match the left image height
-  // It starts at the seam (where left image ends) and goes to the end
+  // It starts at the seam (where cropped left image ends) and goes to the end
   const tileX = v.offsetX;  // where right image starts in the composite
-  const overlapWithLeft = Math.max(0, imgLeft.width - tileX);
+  const overlapWithLeft = Math.max(0, leftEffW - tileX);
 
   // Export only the portion of the right image that extends beyond the left image
   const exportSrcX = srcX + overlapWithLeft;
@@ -190,6 +203,7 @@ function exportRight() {
 
 function exportImage() {
   const v = getVals();
+  const leftEffW = Math.max(1, imgLeft.width - v.cropLeftImgRight);
   const srcX = v.cropLeft;
   const srcY = v.cropTop;
   const srcW = imgRight.width - v.cropLeft - v.cropRight;
@@ -198,7 +212,7 @@ function exportImage() {
 
   const rightX = v.offsetX;
   const rightY = v.offsetY;
-  const totalW = Math.max(imgLeft.width, rightX + srcW);
+  const totalW = Math.max(leftEffW, rightX + srcW);
   const totalH = Math.max(imgLeft.height, rightY + srcH, imgLeft.height);
 
   // Full resolution export
@@ -207,7 +221,8 @@ function exportImage() {
   expCanvas.height = totalH;
   const ectx = expCanvas.getContext('2d');
 
-  ectx.drawImage(imgLeft, 0, 0);
+  // Draw left image cropped on the right
+  ectx.drawImage(imgLeft, 0, 0, leftEffW, imgLeft.height, 0, 0, leftEffW, imgLeft.height);
   ectx.drawImage(imgRight, srcX, srcY, srcW, srcH, rightX, rightY, srcW, srcH);
 
   const dataUrl = expCanvas.toDataURL('image/png');
