@@ -1243,6 +1243,12 @@ function simulateGame(agent, element, ablation) {
         continue;
       }
 
+      // Single-card award screen — commit the card and continue
+      if (gameState.phase === GAME_PHASES.CARD_AWARD) {
+        continueCardAward();
+        continue;
+      }
+
       // Mini-boss victory screen — continue to card reward
       if (gameState.phase === 'mini_boss_victory') {
         // Save state snapshot after first mini-boss

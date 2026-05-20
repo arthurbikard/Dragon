@@ -18,6 +18,9 @@ function renderGame() {
     case GAME_PHASES.CARD_REWARD:
       app.innerHTML = renderCardReward();
       break;
+    case GAME_PHASES.CARD_AWARD:
+      app.innerHTML = renderCardAward();
+      break;
     case 'mini_boss_victory':
       app.innerHTML = renderMiniBossVictory();
       break;
@@ -481,6 +484,28 @@ function renderCardReward() {
         `).join('')}
       </div>
       ${skippable ? '<button class="btn btn-skip" onclick="skipReward()">Leave it</button>' : ''}
+    </div>
+  `;
+}
+
+// === CARD AWARD (single card reveal before adding to deck) ===
+function renderCardAward() {
+  const card = gameState._awardCard;
+  if (!card) {
+    continueCardAward();
+    return '';
+  }
+  const title = gameState._awardTitle || 'A Card Appears';
+  const narration = gameState._awardNarration || '';
+  return `
+    <div class="screen card-award-screen">
+      <h2 class="screen-title">${title}</h2>
+      ${narration ? `<p class="card-award-narration">${narration}</p>` : ''}
+      <div class="card-award-card">
+        ${renderCard(card, -1, false)}
+      </div>
+      <p class="card-award-gained">+ ${card.name}</p>
+      <button class="btn btn-primary" onclick="continueCardAward()">Continue</button>
     </div>
   `;
 }

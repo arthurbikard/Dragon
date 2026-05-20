@@ -602,6 +602,7 @@ function renderRest() {
         </button>
       </div>
       ${npc && !cleared ? `<button class="btn btn-secondary" onclick="enterRestNpc()" style="margin-top:8px">Talk to ${npc.name}</button>` : ''}
+      <button class="btn btn-secondary" onclick="returnToMap()" style="margin-top:8px">Leave</button>
     </div>
   `;
 }
@@ -966,11 +967,24 @@ function doEventChoice(index) {
         showNotification(`+${healed} HP`, 'heal');
       }
     }
+    if (choice.reward.gold) {
+      gameState.campaign.gold += choice.reward.gold;
+      addLog(`Found ${choice.reward.gold} gold.`);
+      showNotification(`+${choice.reward.gold} gold`, 'gold');
+    }
     if (choice.reward.rareCard) {
       const card = getRareCard();
-      gameState.player.deck.push(card);
-      addLog(`Gained rare card: ${card.name}!`);
-      showNotification(`+ ${card.name}`, 'card');
+      clearLocation(gameState.campaign.currentLocation);
+      showCardAward(card, { title: 'A Rare Card', narration: choice.result });
+      return;
+    }
+    if (choice.reward.specificCard) {
+      const card = getRareCardByKey(choice.reward.specificCard);
+      if (card) {
+        clearLocation(gameState.campaign.currentLocation);
+        showCardAward(card, { title: event.title || 'A Card Appears', narration: choice.result });
+        return;
+      }
     }
     if (choice.reward.chestReward) {
       const biome = WORLD.locations[gameState.campaign.currentLocation]?.biome;
@@ -1127,24 +1141,29 @@ function advanceDialogue() {
 function leaveNpc() {
   const npc = gameState._currentNpc;
   const locId = gameState.campaign.currentLocation;
+  const returnToRest = !!gameState._returnToRest;
 
   // Grant NPC reward card if conditions were met
   if (npc && npc._grantReward) {
     const card = getRareCardByKey(npc._grantReward);
-    if (card) {
-      gameState.player.deck.push(card);
-      addLog(`Received: ${card.name}!`);
-      showNotification(`+ ${card.name}`, 'card');
-    }
-    // Track that this reward was collected so it's not given again
     if (!gameState.campaign.npcRewardsCollected) {
       gameState.campaign.npcRewardsCollected = new Set();
     }
     gameState.campaign.npcRewardsCollected.add(locId);
+    if (card) {
+      delete gameState._returnToRest;
+      clearLocation(locId);
+      showCardAward(card, {
+        title: npc.name || 'A Gift',
+        narration: 'A card is pressed into your hands.',
+        returnTo: returnToRest ? 'rest' : 'map',
+      });
+      return;
+    }
   }
 
   // Return to rest screen if NPC was at a rest site
-  if (gameState._returnToRest) {
+  if (returnToRest) {
     delete gameState._returnToRest;
     clearLocation(locId);
     gameState.phase = GAME_PHASES.REST;
@@ -1160,10 +1179,11 @@ function leaveNpc() {
 
 function openTreasure(locId) {
   const card = getRareCard();
-  gameState.player.deck.push(card);
-  addLog(`Found rare card: ${card.name}!`);
   clearLocation(locId);
-  returnToMap();
+  showCardAward(card, {
+    title: 'Treasure!',
+    narration: 'You pry open the chest. A shimmering card rests inside.',
+  });
 }
 
 // Compatibility stubs

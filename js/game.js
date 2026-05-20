@@ -10,6 +10,7 @@ const GAME_PHASES = {
   MAP: 'map',
   BATTLE: 'battle',
   CARD_REWARD: 'card_reward',
+  CARD_AWARD: 'card_award',
   SHOP: 'shop',
   REST: 'rest',
   NPC: 'npc',
@@ -118,6 +119,38 @@ function setupAIBattleByEnemy(enemyId) {
   const enemy = createAIEnemy(enemyId);
   gameState.enemy = enemy;
   gameState.enemy.nextIntent = pickIntent(enemy);
+}
+
+// Show a one-card award screen before the card lands in the deck.
+// options: { title, narration, returnTo: 'map'|'rest'|'npc' }
+function showCardAward(card, options) {
+  if (!card) return;
+  options = options || {};
+  gameState._awardCard = card;
+  gameState._awardTitle = options.title || 'A Card Appears';
+  gameState._awardNarration = options.narration || '';
+  gameState._awardReturn = options.returnTo || 'map';
+  gameState.phase = GAME_PHASES.CARD_AWARD;
+  renderGame();
+}
+
+function continueCardAward() {
+  const card = gameState._awardCard;
+  const returnTo = gameState._awardReturn || 'map';
+  if (card) {
+    gameState.player.deck.push(card);
+    addLog(`Added ${card.name} to deck!`);
+  }
+  delete gameState._awardCard;
+  delete gameState._awardTitle;
+  delete gameState._awardNarration;
+  delete gameState._awardReturn;
+  if (returnTo === 'rest') {
+    gameState.phase = GAME_PHASES.REST;
+    renderGame();
+    return;
+  }
+  returnToMap();
 }
 
 function returnToMap() {
@@ -824,7 +857,7 @@ function restoreGame() {
     if (!save.mode || !save.player || !save.campaign) return false;
     gameState = save;
     // If we were in a transient phase, return to map
-    if (![GAME_PHASES.MAP, GAME_PHASES.SHOP, GAME_PHASES.REST, GAME_PHASES.NPC, GAME_PHASES.EVENT].includes(gameState.phase)) {
+    if (![GAME_PHASES.MAP, GAME_PHASES.SHOP, GAME_PHASES.REST, GAME_PHASES.NPC, GAME_PHASES.EVENT, GAME_PHASES.CARD_AWARD].includes(gameState.phase)) {
       gameState.phase = GAME_PHASES.MAP;
     }
     return true;
