@@ -106,9 +106,9 @@ function prepareBattle() {
   gameState.player.block = 0;
   gameState.player.statuses = [];
 
-  // Reset Root of Power usage for new battle
+  // Reset once-per-battle card usage for new battle
   gameState.player.deck.forEach(card => {
-    if (card.templateKey === 'root_of_power') {
+    if (card.templateKey === 'root_of_power' || card.templateKey === 'corrupted_seal') {
       card.usedThisBattle = false;
     }
   });
@@ -274,8 +274,8 @@ function playCard(index) {
   const card = actor.hand[index];
   if (!card || card.cost > actor.energy) return;
 
-  // Special check for Root of Power - can only be used once per battle
-  if (card.templateKey === 'root_of_power' && card.usedThisBattle) {
+  // Once-per-battle cards
+  if ((card.templateKey === 'root_of_power' || card.templateKey === 'corrupted_seal') && card.usedThisBattle) {
     addLog(`${card.name} can only be used once per battle.`);
     return;
   }
@@ -295,6 +295,10 @@ function playCard(index) {
       dmg = Math.floor(dmg * 1.5);
       addLog(`Elemental advantage! ${ELEMENT_ICONS[card.element]} > ${ELEMENT_ICONS[defender.element]}`);
     }
+
+    // Strength increases YOUR attack damage
+    const str = attacker.statuses ? attacker.statuses.find(s => s.type === 'strength') : null;
+    if (str) dmg += str.value;
 
     // Weak reduces YOUR attack damage
     const weak = attacker.statuses ? attacker.statuses.find(s => s.type === 'weak') : null;
@@ -334,8 +338,8 @@ function playCard(index) {
     }
   }
 
-  // Mark Root of Power as used this battle
-  if (card.templateKey === 'root_of_power') {
+  // Mark once-per-battle cards as used this battle
+  if (card.templateKey === 'root_of_power' || card.templateKey === 'corrupted_seal') {
     card.usedThisBattle = true;
   }
 
@@ -457,8 +461,56 @@ function applyEffect(effect, caster, target) {
       addLog(`Applied Weak for ${effect.duration} turns.`);
       break;
     }
+    case 'strength': {
+      const existing = caster.statuses.find(s => s.type === 'strength');
+      if (existing) {
+        existing.value += effect.value;
+        existing.duration = Math.max(existing.duration, effect.duration);
+      } else {
+        caster.statuses.push({ type: 'strength', value: effect.value, duration: effect.duration });
+      }
+      addLog(`Gained ${effect.value} Strength for ${effect.duration} turns.`);
+      break;
+    }
+    case 'self_burn': {
+      const existing = caster.statuses.find(s => s.type === 'burn');
+      if (existing) {
+        existing.value += effect.value;
+        existing.duration = Math.max(existing.duration, effect.duration);
+      } else {
+        caster.statuses.push({ type: 'burn', value: effect.value, duration: effect.duration });
+      }
+      addLog(`You suffer ${effect.value} Burn for ${effect.duration} turns.`);
+      break;
+    }
+    case 'burning_curse': {
+      // Apply the first burn to the enemy immediately
+      const opponent = (caster === gameState.player) ? gameState.enemy : gameState.player;
+      if (opponent) {
+        const existingBurn = opponent.statuses.find(s => s.type === 'burn');
+        if (existingBurn) {
+          existingBurn.value += effect.value;
+          existingBurn.duration = Math.max(existingBurn.duration, 2);
+        } else {
+          opponent.statuses.push({ type: 'burn', value: effect.value, duration: 2 });
+        }
+      }
+      // Track the curse on the caster for the remaining ticks
+      const remaining = Math.max(0, effect.duration - 1);
+      if (remaining > 0) {
+        const existing = caster.statuses.find(s => s.type === 'burning_curse');
+        if (existing) {
+          existing.value = Math.max(existing.value, effect.value);
+          existing.duration = Math.max(existing.duration, remaining);
+        } else {
+          caster.statuses.push({ type: 'burning_curse', value: effect.value, duration: remaining });
+        }
+      }
+      addLog(`Corrupted seal unleashed: ${effect.value} Burn.`);
+      break;
+    }
     case 'cleanse': {
-      target.statuses = target.statuses.filter(s => ['thorns'].includes(s.type));
+      target.statuses = target.statuses.filter(s => ['thorns', 'strength'].includes(s.type));
       addLog('Debuffs cleansed!');
       break;
     }
@@ -471,6 +523,19 @@ function applyStartOfTurnStatuses(actor, who) {
     if (status.type === 'burn') {
       actor.hp = Math.max(0, actor.hp - status.value);
       addLog(`Burn deals ${status.value} damage.`);
+    }
+    if (status.type === 'burning_curse') {
+      const opponent = (actor === gameState.player) ? gameState.enemy : gameState.player;
+      if (opponent) {
+        const existingBurn = opponent.statuses.find(s => s.type === 'burn');
+        if (existingBurn) {
+          existingBurn.value += status.value;
+          existingBurn.duration = Math.max(existingBurn.duration, 2);
+        } else {
+          opponent.statuses.push({ type: 'burn', value: status.value, duration: 2 });
+        }
+        addLog(`Corruption spreads: ${status.value} Burn applied.`);
+      }
     }
     status.duration--;
     if (status.duration <= 0) {

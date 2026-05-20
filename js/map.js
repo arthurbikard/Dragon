@@ -377,7 +377,7 @@ const EVENTS = {
     title: 'The Corrupted Shrine',
     description: 'The shattered seal of the Earth Guardian oozes dark energy. Fragments of the old binding spell still flicker in the cracks.',
     choices: [
-      { text: 'Touch the broken seal', cost: { hp: 12 }, reward: { rareCard: true }, result: 'Dark energy surges through you. It hurts — but you absorb a fragment of the guardian\'s power.' },
+      { text: 'Touch the broken seal', cost: { hp: 12 }, reward: { specificCard: 'corrupted_seal' }, result: 'Dark energy surges through you. It hurts — but you absorb a fragment of the guardian\'s power.' },
       { text: 'Meditate before the shrine', cost: null, reward: { heal: 10, removeCard: true }, result: 'The old magic is faint but pure. It helps you shed what you don\'t need.' },
       { text: 'Study the glyphs', cost: null, reward: { cardReward: true, cardCount: 2 }, result: 'The ancient symbols reveal forgotten techniques. You learn something new.' },
     ],
@@ -460,7 +460,17 @@ const RARE_CARD_TEMPLATES = {
     cost: 1, damage: 0, block: 0,
     effects: [{ type: 'strength', value: 2, duration: 4 }],
     description: 'Gain 2 Strength for 4 turns. Ancient power flows through your veins.',
-    image: 'images/manual_generations/Gemini_Generated_Image_s73mmos73mmos73m.png', rarity: 'rare',
+    image: 'images/card_root_of_power.png', rarity: 'rare',
+  },
+  corrupted_seal: {
+    name: 'Corrupted Seal', type: CARD_TYPES.SKILL, element: ELEMENTS.EARTH,
+    cost: 1, damage: 0, block: 0,
+    effects: [
+      { type: 'burning_curse', value: 2, duration: 3 },
+      { type: 'self_burn', value: 2, duration: 2 },
+    ],
+    description: 'Apply 2 Burn to enemy each turn for 3 turns. Suffer 2 Burn for 2 turns. Once per battle.',
+    image: 'images/card_corrupted_seal.png', rarity: 'rare',
   },
 };
 
@@ -655,8 +665,8 @@ function getRareCardByKey(key) {
     effects: template.effects.map(e => ({ ...e })),
   };
 
-  // Initialize Root of Power special state
-  if (key === 'root_of_power') {
+  // Initialize once-per-battle card state
+  if (key === 'root_of_power' || key === 'corrupted_seal') {
     card.usedThisBattle = false;
   }
 

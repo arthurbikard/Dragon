@@ -404,8 +404,8 @@ function createCard(templateKey) {
     effects: template.effects.map(e => ({ ...e })),
   };
 
-  // Initialize Root of Power special state
-  if (templateKey === 'root_of_power') {
+  // Initialize once-per-battle card state
+  if (templateKey === 'root_of_power' || templateKey === 'corrupted_seal') {
     card.usedThisBattle = false;
   }
 

@@ -358,7 +358,7 @@ function renderEnergy(energy) {
 function renderStatuses(actor) {
   if (!actor.statuses.length) return '';
   return `<div class="statuses">${actor.statuses.map(s => {
-    const icons = { burn: icon('fire', 12, '#e05555'), thorns: icon('thorns', 12, '#88cc88'), vulnerable: icon('broken-heart', 12, '#cc5588'), strength: icon('muscle', 12, '#e0a030'), weak: icon('dizzy', 12, '#8888aa') };
+    const icons = { burn: icon('fire', 12, '#e05555'), thorns: icon('thorns', 12, '#88cc88'), vulnerable: icon('broken-heart', 12, '#cc5588'), strength: icon('muscle', 12, '#e0a030'), weak: icon('dizzy', 12, '#8888aa'), burning_curse: icon('skull', 12, '#c060c0') };
     return `<span class="status-badge status-${s.type}" title="${s.type}: ${s.value} (${s.duration} turns)">${icons[s.type] || '?'} ${s.value}</span>`;
   }).join('')}</div>`;
 }
