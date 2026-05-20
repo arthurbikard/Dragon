@@ -1,1 +1,11 @@
 .env
+
+# Windows / WSL metadata files
+*:Zone.Identifier
+
+# Simulator trace and history output
+/sim-traces.json
+/sim-history.json
+/forest-traces.json
+/lookahead-traces.json
+/post-drake.json
