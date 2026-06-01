@@ -59,6 +59,17 @@ function initDragListeners() {
     };
   }
 
+  // Forward horizontal wheel/trackpad input to the viewport explicitly.
+  // Default bubbling sometimes fails when the cursor is over a child
+  // element (the location nodes), especially in dev/move mode.
+  canvas.addEventListener('wheel', (e) => {
+    if (_dragTarget) return; // don't fight an active drag
+    if (e.deltaX !== 0) {
+      e.preventDefault();
+      viewport.scrollLeft += e.deltaX;
+    }
+  }, { passive: false });
+
   // Use document-level listeners so drag continues even outside the canvas
   canvas.addEventListener('mousedown', (e) => {
     const node = e.target.closest('.world-location');
@@ -201,17 +212,34 @@ var _linkMode = false;
 var _linkSource = null;
 var _moveMode = false;
 
+// Re-render the map without losing viewport scroll position.
+// renderGame() replaces #app, so the old worldViewport (and its drag
+// listeners) are gone — capture scroll first, restore after.
+function _rerenderMapPreservingScroll() {
+  const old = document.getElementById('worldViewport');
+  const scroll = old ? { left: old.scrollLeft, top: old.scrollTop } : null;
+  renderGame();
+  requestAnimationFrame(() => {
+    renderWorldPaths();
+    initDragListeners();
+    if (scroll) {
+      const v = document.getElementById('worldViewport');
+      if (v) { v.scrollLeft = scroll.left; v.scrollTop = scroll.top; }
+    }
+  });
+}
+
 function toggleMoveMode() {
   _moveMode = !_moveMode;
   if (_moveMode) _linkMode = false;
-  renderGame();
+  _rerenderMapPreservingScroll();
 }
 
 function toggleLinkMode() {
   _linkMode = !_linkMode;
   _linkSource = null;
   if (_linkMode) _moveMode = false;
-  renderGame();
+  _rerenderMapPreservingScroll();
 }
 
 function onDebugNodeClick(locId) {
