@@ -747,6 +747,9 @@ function rollAmbush(locId) {
   if (!loc) return null;
   if (gameState.campaign.visited.size <= 3) return null; // safe early game
 
+  // Shops and resting places are safe havens — never ambushed.
+  if (loc.type === LOC_TYPES.SHOP || loc.type === LOC_TYPES.REST) return null;
+
   const isCombat = [LOC_TYPES.BATTLE, LOC_TYPES.ELITE, LOC_TYPES.MINI_BOSS, LOC_TYPES.BOSS].includes(loc.type);
   // No ambush on uncleared combat locations (already fighting there)
   if (isCombat && !gameState.campaign.cleared.has(locId)) return null;
