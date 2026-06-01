@@ -9,3 +9,6 @@
 /forest-traces.json
 /lookahead-traces.json
 /post-drake.json
+
+# Full-res manual art source generations (game ships the cropped versions)
+images/manual_generations/
