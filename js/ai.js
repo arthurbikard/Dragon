@@ -110,7 +110,7 @@ const AI_ENEMIES = [
     element: ELEMENTS.EARTH,
     hp: 200,
     maxHp: 200,
-    image: 'images/enemy_ember_titan.png',
+    image: 'images/enemy_corrupted_treant.png',
     // Forest mini-boss — high HP, thorns punish attackers, strength snowballs
     intents: [
       { type: INTENT_TYPES.ATTACK, damage: 14, weight: 3 },

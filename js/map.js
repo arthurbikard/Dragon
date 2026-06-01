@@ -343,7 +343,7 @@ const WORLD = {
       x: 27.3, y: 5.1,
       paths: ['corrupted_shrine', 'ancient_stump', 'deep_woods', 'warded_pass'],
       description: 'At the center of the forest stands a massive corrupted treant, its roots choking the land. The path to the mountains lies beyond.',
-      image: 'images/loc_volcano_peak.png',
+      image: 'images/enemy_corrupted_treant.png',
       enemy: 'corrupted_treant',
       goldReward: 30,
       blessing: 'storm_shield',
