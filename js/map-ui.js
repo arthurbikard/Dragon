@@ -23,6 +23,7 @@ function renderMap() {
       </div>
       <div class="world-viewport" id="worldViewport">
         <div class="world-canvas" id="worldCanvas">
+          ${renderWorldFog()}
           <svg class="world-paths" id="worldPaths"></svg>
           ${renderWorldLocations()}
           ${renderPlayerMarker()}
@@ -355,6 +356,67 @@ function renderPlayerMarker() {
   if (!loc) return '';
   const pos = getLocationPixelPos(loc);
   return `<div class="player-marker" style="left: ${pos.x}px; top: ${pos.y}px">▼</div>`;
+}
+
+// Fog of war: an opaque mist over the map background, cleared in a soft
+// radius around every explored node and along the paths that link them.
+const FOG_CLEAR_RADIUS = 78; // px of clear map around nodes and path corridors
+const FOG_FEATHER = 28;      // px soft-edge falloff (mask blur stdDeviation)
+
+function renderWorldFog() {
+  if (MAP_DEBUG) return ''; // dev mode reveals the whole map
+  const campaign = gameState.campaign;
+
+  let shapes = '';
+  const drawn = new Set();
+  for (const [id, loc] of Object.entries(WORLD.locations)) {
+    if (!campaign.explored.has(id)) continue;
+    const from = getLocationPixelPos(loc);
+    // Clear a disc around the node itself
+    shapes += `<circle cx="${from.x}" cy="${from.y}" r="${FOG_CLEAR_RADIUS}"/>`;
+    // Clear a corridor along each link to another explored node
+    for (const connId of (loc.paths || [])) {
+      if (!campaign.explored.has(connId) || !WORLD.locations[connId]) continue;
+      const key = [id, connId].sort().join('-');
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const to = getLocationPixelPos(WORLD.locations[connId]);
+      shapes += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke-width="${FOG_CLEAR_RADIUS * 2}" stroke-linecap="round"/>`;
+    }
+  }
+
+  // Mask: white = mist shown, black = mist cleared (background shows through).
+  // The reveal shapes are solid black, blurred to feather the fog's edge.
+  // The mist itself is opaque grey cloud, generated with fractal-noise turbulence.
+  return `
+    <svg class="world-fog" id="worldFog">
+      <defs>
+        <filter id="fogBlur" filterUnits="userSpaceOnUse" x="-100" y="-100" width="3900" height="800">
+          <feGaussianBlur stdDeviation="${FOG_FEATHER}"/>
+        </filter>
+        <filter id="fogClouds" filterUnits="userSpaceOnUse" x="0" y="0" width="3700" height="560">
+          <feTurbulence type="fractalNoise" baseFrequency="0.013 0.028" numOctaves="4" seed="11" stitchTiles="stitch" result="n"/>
+          <feColorMatrix in="n" type="matrix"
+            values="0.33 0.33 0.33 0 0
+                    0.33 0.33 0.33 0 0
+                    0.33 0.33 0.33 0 0
+                    0    0    0    0 1" result="g"/>
+          <feComponentTransfer in="g">
+            <feFuncR type="linear" slope="0.62" intercept="0.18"/>
+            <feFuncG type="linear" slope="0.62" intercept="0.20"/>
+            <feFuncB type="linear" slope="0.64" intercept="0.25"/>
+          </feComponentTransfer>
+        </filter>
+        <mask id="fogMask">
+          <rect x="0" y="0" width="100%" height="100%" fill="#fff"/>
+          <g filter="url(#fogBlur)" fill="#000" stroke="#000">
+            ${shapes}
+          </g>
+        </mask>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" filter="url(#fogClouds)" mask="url(#fogMask)"/>
+    </svg>
+  `;
 }
 
 function renderWorldPaths() {

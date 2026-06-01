@@ -716,6 +716,12 @@ function clearLocation(locId) {
   if (loc && loc.paths) {
     loc.paths.forEach(id => gameState.campaign.explored.add(id));
   }
+  // Defeating a mini-boss lifts the fog from its entire biome.
+  if (loc && loc.type === LOC_TYPES.MINI_BOSS && loc.biome) {
+    for (const [id, l] of Object.entries(WORLD.locations)) {
+      if (l.biome === loc.biome) gameState.campaign.explored.add(id);
+    }
+  }
 }
 
 function getConnectedLocations() {

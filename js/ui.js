@@ -155,6 +155,17 @@ function toggleDevMode() {
   renderGame();
 }
 
+// Dev mode: bail out of any battle back to the map (or menu in PVP)
+function devExitBattle() {
+  if (!MAP_DEBUG) return;
+  if (gameState.mode === GAME_MODES.PVP) {
+    returnToMenu();
+    return;
+  }
+  addLog('Dev: exited battle.');
+  returnToMap();
+}
+
 function hardReload() {
   if ('caches' in window) {
     caches.keys().then(names => names.forEach(name => caches.delete(name)));
@@ -228,6 +239,7 @@ function renderBattle() {
 
   return `
     <div class="screen battle-screen">
+      ${MAP_DEBUG ? `<button class="dev-exit-battle" onclick="devExitBattle()" title="Dev: exit battle">${icon('wrench', 12)} Exit</button>` : ''}
       ${renderEnemyArea(topCombatant)}
       <div class="combat-log">${lastLog ? `<span class="log-entry">${lastLog}</span>` : ''}</div>
       ${renderPlayerBar(bottomCombatant, canAct)}
